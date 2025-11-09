@@ -1,14 +1,20 @@
-package promise
+package promise_test
 
 import (
 	"errors"
+	"github.com/TikaFlow/promise-go"
+	ip "github.com/TikaFlow/promise-go/ipromise"
 	"testing"
 	"time"
 )
 
+var (
+	pm *promise.PromiseManager
+)
+
 // 测试Promise的基本创建和解决
 func TestPromiseBasicResolve(t *testing.T) {
-	p := New(func(resolve, reject func(any)) error {
+	p := pm.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -23,14 +29,11 @@ func TestPromiseBasicResolve(t *testing.T) {
 		t.Errorf("Promise should not be rejected, got reason: %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Promise的基本创建和拒绝
 func TestPromiseBasicReject(t *testing.T) {
-	p := New(func(resolve, reject func(any)) error {
+	p := pm.New(func(resolve, reject func(any)) error {
 		reject("failure")
 		return nil
 	})
@@ -45,16 +48,13 @@ func TestPromiseBasicReject(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Promise执行器错误处理
 func TestPromiseExecutorError(t *testing.T) {
 	errorMsg := "executor error"
 
-	p := New(func(resolve, reject func(any)) error {
+	p := pm.New(func(resolve, reject func(any)) error {
 		return errors.New(errorMsg)
 	})
 
@@ -72,9 +72,6 @@ func TestPromiseExecutorError(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试nil执行器
@@ -85,13 +82,13 @@ func TestPromiseNilExecutor(t *testing.T) {
 		}
 	}()
 
-	New(nil)
-	// 注意：由于执行器为nil会立即panic，所以不需要Play和等待
+	pm.New(nil)
+	// 注意：由于执行器为nil会立即panic，所以不需要RunLoop和等待
 }
 
 // 测试Then方法的基本功能 - 成功回调
 func TestPromiseThenFulfilled(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
@@ -104,14 +101,11 @@ func TestPromiseThenFulfilled(t *testing.T) {
 		}
 		return nil, nil
 	}, nil)
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Then方法的基本功能 - 拒绝回调
 func TestPromiseThenRejected(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
@@ -124,14 +118,11 @@ func TestPromiseThenRejected(t *testing.T) {
 		}
 		return nil, nil
 	}, nil)
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Then方法的穿透 - 成功状态
 func TestPromiseThenPassThroughFulfilled(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve("value")
 		return nil
 	})
@@ -142,14 +133,11 @@ func TestPromiseThenPassThroughFulfilled(t *testing.T) {
 		}
 		return nil, nil
 	}, nil)
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Then方法的穿透 - 拒绝状态
 func TestPromiseThenPassThroughRejected(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		reject("reason")
 		return nil
 	})
@@ -160,14 +148,11 @@ func TestPromiseThenPassThroughRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Then方法回调函数抛出错误
 func TestPromiseThenCallbackError(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve("value")
 		return nil
 	})
@@ -180,14 +165,11 @@ func TestPromiseThenCallbackError(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Then方法链式调用
 func TestPromiseThenChaining(t *testing.T) {
-	New(func(resolve, reject func(any)) error {
+	pm.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	}).Then(func(v any) (any, error) {
@@ -200,14 +182,11 @@ func TestPromiseThenChaining(t *testing.T) {
 		}
 		return nil, nil
 	}, nil)
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Catch方法
 func TestPromiseCatch(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
@@ -220,16 +199,13 @@ func TestPromiseCatch(t *testing.T) {
 		}
 		return nil, nil
 	}, nil)
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Finally方法 - 成功状态
 func TestPromiseFinallyFulfilled(t *testing.T) {
 	finallyCalled := false
 
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -246,16 +222,13 @@ func TestPromiseFinallyFulfilled(t *testing.T) {
 		}
 		return nil, nil
 	}, nil)
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Finally方法 - 拒绝状态
 func TestPromiseFinallyRejected(t *testing.T) {
 	finallyCalled := false
 
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
@@ -272,14 +245,11 @@ func TestPromiseFinallyRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Finally方法抛出错误
 func TestPromiseFinallyError(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -295,19 +265,16 @@ func TestPromiseFinallyError(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Finally方法返回被拒绝的Promise
 func TestPromiseFinallyReturnsRejectedPromise(t *testing.T) {
-	rejectedPromise := New(func(resolve, reject func(any)) error {
+	rejectedPromise := pm.New(func(resolve, reject func(any)) error {
 		reject("rejected from finally")
 		return nil
 	})
 
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -323,27 +290,24 @@ func TestPromiseFinallyReturnsRejectedPromise(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试All方法 - 所有Promise都成功
 func TestPromiseAllFulfilled(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		resolve(2)
 		return nil
 	})
-	p3 := New(func(resolve, reject func(any)) error {
+	p3 := pm.New(func(resolve, reject func(any)) error {
 		resolve(3)
 		return nil
 	})
 
-	All([]Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	pm.All([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		results, ok := v.([]any)
 		if !ok {
 			t.Errorf("Expected []any type, got %T", v)
@@ -359,27 +323,24 @@ func TestPromiseAllFulfilled(t *testing.T) {
 		t.Errorf("Promise.All should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试All方法 - 有一个Promise被拒绝
 func TestPromiseAllRejected(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
-	p3 := New(func(resolve, reject func(any)) error {
+	p3 := pm.New(func(resolve, reject func(any)) error {
 		resolve(3)
 		return nil
 	})
 
-	All([]Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	pm.All([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.All should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -388,14 +349,11 @@ func TestPromiseAllRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试All方法 - 空数组
 func TestPromiseAllEmptyArray(t *testing.T) {
-	allPromise := All([]Promise{})
+	allPromise := pm.All([]ip.Promise{})
 
 	allPromise.Then(func(v any) (any, error) {
 		results, ok := v.([]any)
@@ -410,28 +368,25 @@ func TestPromiseAllEmptyArray(t *testing.T) {
 		t.Errorf("Promise.All should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试AllSettled方法
 func TestPromiseAllSettled(t *testing.T) {
 
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
-	p3 := New(func(resolve, reject func(any)) error {
+	p3 := pm.New(func(resolve, reject func(any)) error {
 		resolve(3)
 		return nil
 	})
 
-	AllSettled([]Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	pm.AllSettled([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		results, ok := v.([]map[string]any)
 		if !ok {
 			t.Errorf("Expected []map[string]any type, got %T", v)
@@ -440,13 +395,13 @@ func TestPromiseAllSettled(t *testing.T) {
 			t.Errorf("Expected 3 results, got %d", len(results))
 		}
 
-		if results[0]["status"] != Fulfilled || results[0]["value"] != 1 {
+		if results[0]["status"] != ip.Fulfilled || results[0]["value"] != 1 {
 			t.Errorf("Expected first result to be fulfilled with value 1, got %v", results[0])
 		}
-		if results[1]["status"] != Rejected || results[1]["reason"] != "error" {
+		if results[1]["status"] != ip.Rejected || results[1]["reason"] != "error" {
 			t.Errorf("Expected second result to be rejected with reason 'error', got %v", results[1])
 		}
-		if results[2]["status"] != Fulfilled || results[2]["value"] != 3 {
+		if results[2]["status"] != ip.Fulfilled || results[2]["value"] != 3 {
 			t.Errorf("Expected third result to be fulfilled with value 3, got %v", results[2])
 		}
 		return nil, nil
@@ -454,14 +409,11 @@ func TestPromiseAllSettled(t *testing.T) {
 		t.Errorf("Promise.AllSettled should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试AllSettled方法 - 空数组
 func TestPromiseAllSettledEmptyArray(t *testing.T) {
-	AllSettled([]Promise{}).Then(func(v any) (any, error) {
+	pm.AllSettled([]ip.Promise{}).Then(func(v any) (any, error) {
 		results, ok := v.([]map[string]any)
 		if !ok {
 			t.Errorf("Expected []map[string]any type, got %T", v)
@@ -474,27 +426,24 @@ func TestPromiseAllSettledEmptyArray(t *testing.T) {
 		t.Errorf("Promise.AllSettled should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Any方法 - 有一个Promise成功
 func TestPromiseAnyFulfilled(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		reject("error1")
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
-	p3 := New(func(resolve, reject func(any)) error {
+	p3 := pm.New(func(resolve, reject func(any)) error {
 		reject("error2")
 		return nil
 	})
 
-	Any([]Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	pm.Any([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		if v != "success" {
 			t.Errorf("Expected value 'success', got %v", v)
 		}
@@ -503,23 +452,20 @@ func TestPromiseAnyFulfilled(t *testing.T) {
 		t.Errorf("Promise.Any should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Any方法 - 所有Promise都失败
 func TestPromiseAnyAllRejected(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		reject("error1")
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		reject("error2")
 		return nil
 	})
 
-	Any([]Promise{p1, p2}).Then(func(v any) (any, error) {
+	pm.Any([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Any should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -537,15 +483,11 @@ func TestPromiseAnyAllRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Any方法 - 空数组
 func TestPromiseAnyEmptyArray(t *testing.T) {
-	// 测试Any方法在空数组时的行为
-	Any([]Promise{}).Then(func(v any) (any, error) {
+	pm.Any([]ip.Promise{}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Any with empty array should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -560,14 +502,11 @@ func TestPromiseAnyEmptyArray(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Race方法 - 第一个完成的是成功的Promise
 func TestPromiseRaceFulfilled(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较长
@@ -576,7 +515,7 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 		}()
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较短
@@ -586,7 +525,7 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 		return nil
 	})
 
-	Race([]Promise{p1, p2}).Then(func(v any) (any, error) {
+	pm.Race([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
 		if v != "success" {
 			t.Errorf("Expected value 'success', got %v", v)
 		}
@@ -595,14 +534,11 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 		t.Errorf("Promise.Race should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Race方法 - 第一个完成的是失败的Promise
 func TestPromiseRaceRejected(t *testing.T) {
-	p1 := New(func(resolve, reject func(any)) error {
+	p1 := pm.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较短
@@ -611,7 +547,7 @@ func TestPromiseRaceRejected(t *testing.T) {
 		}()
 		return nil
 	})
-	p2 := New(func(resolve, reject func(any)) error {
+	p2 := pm.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较长
@@ -621,7 +557,7 @@ func TestPromiseRaceRejected(t *testing.T) {
 		return nil
 	})
 
-	Race([]Promise{p1, p2}).Then(func(v any) (any, error) {
+	pm.Race([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Race should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -630,14 +566,11 @@ func TestPromiseRaceRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(2 * time.Second)
 }
 
 // 测试Race方法 - 空数组
 func TestPromiseRaceEmptyArray(t *testing.T) {
-	racePromise := Race([]Promise{})
+	racePromise := pm.Race([]ip.Promise{})
 
 	go func() {
 		// 空数组的Race应该返回一个pending状态的Promise
@@ -651,21 +584,18 @@ func TestPromiseRaceEmptyArray(t *testing.T) {
 			state = racePromise.State()
 		case <-timer.C:
 			// 超时，说明Promise仍然是pending状态
-			state = Pending
+			state = ip.Pending
 		}
 
-		if state != Pending {
+		if state != ip.Pending {
 			t.Errorf("Expected state Pending for empty array Race, got %s", state)
 		}
 	}()
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Resolve方法 - 普通值
 func TestPromiseResolve(t *testing.T) {
-	Resolve("value").Then(func(v any) (any, error) {
+	pm.Resolve("value").Then(func(v any) (any, error) {
 		if v != "value" {
 			t.Errorf("Expected value 'value', got %v", v)
 		}
@@ -674,19 +604,16 @@ func TestPromiseResolve(t *testing.T) {
 		t.Errorf("Promise.Resolve should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Resolve方法 - Promise对象
 func TestPromiseResolvePromise(t *testing.T) {
-	original := New(func(resolve, reject func(any)) error {
+	original := pm.New(func(resolve, reject func(any)) error {
 		resolve("original")
 		return nil
 	})
 
-	p := Resolve(original)
+	p := pm.Resolve(original)
 
 	if p != original {
 		t.Errorf("Expected Resolve to return the same Promise instance")
@@ -701,14 +628,11 @@ func TestPromiseResolvePromise(t *testing.T) {
 		t.Errorf("Expected state Fulfilled, got Rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Reject方法
 func TestPromiseReject(t *testing.T) {
-	Reject("reason").Then(func(v any) (any, error) {
+	pm.Reject("reason").Then(func(v any) (any, error) {
 		t.Errorf("Promise.Reject should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -717,14 +641,11 @@ func TestPromiseReject(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Try方法 - 成功
 func TestPromiseTrySuccess(t *testing.T) {
-	Try(func(args ...any) (any, error) {
+	pm.Try(func(args ...any) (any, error) {
 		return "success", nil
 	}).Then(func(v any) (any, error) {
 		if v != "success" {
@@ -735,14 +656,11 @@ func TestPromiseTrySuccess(t *testing.T) {
 		t.Errorf("Promise.Try should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Try方法 - 失败
 func TestPromiseTryError(t *testing.T) {
-	Try(func(args ...any) (any, error) {
+	pm.Try(func(args ...any) (any, error) {
 		return "error value", errors.New("error")
 	}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Try should be rejected, but was fulfilled with %v", v)
@@ -753,14 +671,11 @@ func TestPromiseTryError(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Try方法 - nil函数
 func TestPromiseTryNilFunc(t *testing.T) {
-	Try(nil).Then(func(v any) (any, error) {
+	pm.Try(nil).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Try with nil func should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -773,15 +688,12 @@ func TestPromiseTryNilFunc(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试PromiseWithResolvers方法
 func TestPromiseWithResolvers(t *testing.T) {
 	// 测试成功情况
-	promise, resolve, _ := PromiseWithResolvers()
+	promise, resolve, _ := pm.PromiseWithResolvers()
 	resolve("resolved value")
 
 	promise.Then(func(v any) (any, error) {
@@ -795,7 +707,7 @@ func TestPromiseWithResolvers(t *testing.T) {
 	})
 
 	// 测试拒绝情况
-	promise2, _, reject2 := PromiseWithResolvers()
+	promise2, _, reject2 := pm.PromiseWithResolvers()
 	reject2("rejected reason")
 
 	promise2.Then(func(v any) (any, error) {
@@ -807,19 +719,16 @@ func TestPromiseWithResolvers(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试循环引用检测
 func TestPromiseCycleDetection(t *testing.T) {
-	initial := New(func(resolve, reject func(any)) error {
+	initial := pm.New(func(resolve, reject func(any)) error {
 		resolve("initial")
 		return nil
 	})
 
-	var p Promise
+	var p ip.Promise
 	p = initial.Then(func(_ any) (any, error) {
 		return p, nil
 	}, nil)
@@ -837,19 +746,16 @@ func TestPromiseCycleDetection(t *testing.T) {
 		}
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试Thenable对象处理
 func TestPromiseThenable(t *testing.T) {
-	thenable := New(func(resolve, reject func(any)) error {
+	thenable := pm.New(func(resolve, reject func(any)) error {
 		resolve("thenable value")
 		return nil
 	})
 
-	p := New(func(resolve, reject func(any)) error {
+	p := pm.New(func(resolve, reject func(any)) error {
 		resolve(thenable)
 		return nil
 	})
@@ -863,14 +769,11 @@ func TestPromiseThenable(t *testing.T) {
 		t.Errorf("Promise with Thenable should be fulfilled, but was rejected with %v", v)
 		return nil, nil
 	})
-
-	// 运行事件循环以处理微任务
-	Play(time.Second)
 }
 
 // 测试多个Then调用的顺序
 func TestPromiseMultipleThenOrder(t *testing.T) {
-	p := New(func(resolve, reject func(any)) error {
+	p := pm.New(func(resolve, reject func(any)) error {
 		resolve("value")
 		return nil
 	})
@@ -905,7 +808,12 @@ func TestPromiseMultipleThenOrder(t *testing.T) {
 		}
 		return nil, nil
 	})
+}
+
+func TestMain(m *testing.M) {
+	pm = promise.GetPromiseManager(time.Second)
+	m.Run()
 
 	// 运行事件循环以处理微任务
-	Play(time.Second)
+	pm.RunLoop(nil)
 }
