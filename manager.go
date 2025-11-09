@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-// ====== 工厂类 =======
+// PromiseManager 是一个 Promise 管理器，用于管理 Promise 的执行和状态变更。
+// 仅限单线程使用，否则无法保证执行顺序。
 type PromiseManager struct {
 	microtaskQuene chan func()
 	timer          *time.Timer
@@ -15,6 +16,7 @@ type PromiseManager struct {
 	started        bool
 }
 
+// GetPromiseManager 获取一个 Promise 管理器实例。
 func GetPromiseManager(timeout time.Duration) *PromiseManager {
 	return &PromiseManager{
 		microtaskQuene: make(chan func(), 1024),
@@ -24,6 +26,7 @@ func GetPromiseManager(timeout time.Duration) *PromiseManager {
 	}
 }
 
+// New 创建一个新的 Promise 实例。
 func (pm *PromiseManager) New(exec ip.Executor) ip.Promise {
 	if exec == nil {
 		panic("Promise executor must be a function")
@@ -37,10 +40,19 @@ func (pm *PromiseManager) New(exec ip.Executor) ip.Promise {
 		manager:         pm,
 	}
 
+	called := false
 	res := func(data any) {
+		if called {
+			return
+		}
+		called = true
 		pm.resolve(prom, data)
 	}
 	rej := func(reason any) {
+		if called {
+			return
+		}
+		called = true
 		pm.reject(prom, reason)
 	}
 
@@ -50,14 +62,18 @@ func (pm *PromiseManager) New(exec ip.Executor) ip.Promise {
 	return prom
 }
 
+// All 等待所有 Promise 解决。
+// 如果所有 Promise 都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有 Promise 解决值的数组；
+// 如果任何一个 Promise 被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的 Promise 的拒绝理由。
 func (pm *PromiseManager) All(proms []ip.Promise) ip.Promise {
-	return pm.New(func(resolve, reject func(v any)) error {
-		// 处理空数组情况
-		if len(proms) == 0 {
-			resolve(make([]any, 0))
-			return nil
-		}
+	if proms == nil {
+		return pm.Reject("TypeError: nil is not iterable")
+	}
+	if len(proms) == 0 {
+		return pm.Resolve(make([]any, 0))
+	}
 
+	return pm.New(func(resolve, reject func(v any)) error {
 		results := make([]any, len(proms))
 		var count int32 = 0
 		// 使用闭包变量来防止多次resolve/reject
@@ -100,14 +116,17 @@ func (pm *PromiseManager) All(proms []ip.Promise) ip.Promise {
 	})
 }
 
+// AllSettled 等待所有 Promise 完成（无论成功失败）。
+// 新 Promise 会在所有 Promise 完成后解决，解决值为一个包含所有 Promise 完成状态和结果的数组。
 func (pm *PromiseManager) AllSettled(proms []ip.Promise) ip.Promise {
-	return pm.New(func(resolve, reject func(v any)) error {
-		// 处理空数组情况
-		if len(proms) == 0 {
-			resolve(make([]map[string]any, 0))
-			return nil
-		}
+	if proms == nil {
+		return pm.Reject("TypeError: nil is not iterable")
+	}
+	if len(proms) == 0 {
+		return pm.Resolve(make([]map[string]any, 0))
+	}
 
+	return pm.New(func(resolve, reject func(v any)) error {
 		// 定义结果结构，包含status和value/reason
 		type result struct {
 			Status string
@@ -154,18 +173,22 @@ func (pm *PromiseManager) AllSettled(proms []ip.Promise) ip.Promise {
 	})
 }
 
+// Any 等待第一个 Promise 解决。
+// 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的 Promise 的解决值。
+// 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的数组。
 func (pm *PromiseManager) Any(proms []ip.Promise) ip.Promise {
-	return pm.New(func(resolve, reject func(v any)) error {
-		// 处理空数组情况
-		if len(proms) == 0 {
-			result := make(map[string]any)
-			result["errors"] = make([]any, 0)
-			result["stack"] = "AggregateError: All promises were rejected"
-			result["message"] = "All promises were rejected"
-			reject(result)
-			return nil
-		}
+	if proms == nil {
+		return pm.Reject("TypeError: nil is not iterable")
+	}
+	if len(proms) == 0 {
+		result := make(map[string]any)
+		result["errors"] = make([]any, 0)
+		result["stack"] = "AggregateError: All promises were rejected"
+		result["message"] = "All promises were rejected"
+		return pm.Reject(result)
+	}
 
+	return pm.New(func(resolve, reject func(v any)) error {
 		reasons := make([]any, len(proms))
 		var count int32 = 0
 		// 使用闭包变量来防止多次resolve/reject
@@ -212,7 +235,13 @@ func (pm *PromiseManager) Any(proms []ip.Promise) ip.Promise {
 	})
 }
 
+// Race 等待第一个 Promise 完成。
+// 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由为第一个完成的 Promise 的解决值或拒绝理由。
 func (pm *PromiseManager) Race(proms []ip.Promise) ip.Promise {
+	if proms == nil {
+		return pm.Reject("TypeError: nil is not iterable")
+	}
+
 	return pm.New(func(resolve, reject func(v any)) error {
 		// 处理空数组情况
 		if len(proms) == 0 {
@@ -251,6 +280,8 @@ func (pm *PromiseManager) Race(proms []ip.Promise) ip.Promise {
 	})
 }
 
+// Resolve 返回一个已解决的 Promise，解决值为指定值。
+// 如果值已经是 Promise，则直接返回该 Promise。
 // ref: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/resolve
 func (pm *PromiseManager) Resolve(value any) ip.Promise {
 	// 如果值已经是Promise，直接返回
@@ -265,6 +296,7 @@ func (pm *PromiseManager) Resolve(value any) ip.Promise {
 	})
 }
 
+// Reject 返回一个已拒绝的 Promise，拒绝理由为指定值。
 // ref: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 func (pm *PromiseManager) Reject(reason any) ip.Promise {
 	// 创建一个已拒绝的Promise
@@ -291,6 +323,8 @@ func (pm *PromiseManager) Try(fn func(...any) (any, error), args ...any) ip.Prom
 	})
 }
 
+// PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve 和 reject 函数。
+// 这使得可以在 Promise 外部手动解决或拒绝 Promise。
 // ref: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
 func (pm *PromiseManager) PromiseWithResolvers() (ip.Promise, func(any), func(any)) {
 	var resolve, reject func(any)
@@ -429,14 +463,19 @@ func (pm *PromiseManager) flushHandlers(cur *promiseImpl) {
 	})
 }
 
-// ====== 其他方法 ======
-// 同步阻塞等待 Promise 完成并返回其状态和值
+// ====== 辅助函数【结束】 ======
+
+// Wait 同步阻塞等待 Promise 完成并返回其状态和值。
 func (pm *PromiseManager) Wait(prom ip.Promise) (state string, value any) {
 	<-prom.Done()
 	return prom.State(), prom.Result()
 }
 
-// 模拟事件循环
+// RunLoop 模拟事件循环，执行微任务队列中的任务。
+// 如果 done 通道不为 nil，则在事件循环完成时关闭该通道，用于通知外部“事件循环已结束”。
+// 如果多次调用，后续调用将报错“PromiseManager already started”。
+// 注意：该方法将阻塞当前 goroutine，直到事件循环完成或超时退出；
+// 如需异步运行事件循环或手动控制结束时间（而非默认超时时间），请使用 RunLoopAsync 方法。
 func (pm *PromiseManager) RunLoop(done chan struct{}) error {
 	if pm.started {
 		return errors.New("PromiseManager already started")
@@ -459,6 +498,9 @@ func (pm *PromiseManager) RunLoop(done chan struct{}) error {
 	}
 }
 
+// RunLoopAsync 模拟事件循环，异步执行微任务队列中的任务。
+// 返回一个 done 通道，用于手动控制事件循环结束。
+// 如果多次调用，后续调用将报错“PromiseManager already started”。
 func (pm *PromiseManager) RunLoopAsync() (chan struct{}, error) {
 	if pm.started {
 		return nil, errors.New("PromiseManager already started")

@@ -86,6 +86,66 @@ func TestPromiseNilExecutor(t *testing.T) {
 	// 注意：由于执行器为nil会立即panic，所以不需要RunLoop和等待
 }
 
+// 测试执行器中多次调用resolve或reject
+func TestPromiseExecutorMultipleCalls(t *testing.T) {
+	slowProm := pm.New(func(resolve, reject func(any)) error {
+		go func() {
+			time.Sleep(200 * time.Millisecond)
+			resolve("slow")
+		}()
+		return nil
+	})
+	fastProm := pm.New(func(resolve, reject func(any)) error {
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			resolve("fast")
+		}()
+		return nil
+	})
+
+	p := pm.New(func(resolve, reject func(any)) error {
+		resolve(slowProm)
+		reject(fastProm)
+		return nil
+	})
+
+	p.Then(func(v any) (any, error) {
+		if v != "slow" {
+			t.Errorf("Expected value 'slow', got %v", v)
+		}
+		return nil, nil
+	}, func(v any) (any, error) {
+		t.Errorf("Promise should not be rejected, got reason: %v", v)
+		return nil, nil
+	})
+}
+
+// 测试执行器在resolve或reject已调用后报错
+func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
+	delayResolve := pm.New(func(resolve, reject func(any)) error {
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			resolve("success")
+		}()
+		return nil
+	})
+
+	p := pm.New(func(resolve, reject func(any)) error {
+		resolve(delayResolve)
+		return errors.New("executor error after resolve")
+	})
+
+	p.Then(func(v any) (any, error) {
+		if v != "success" {
+			t.Errorf("Expected value 'success', got %v", v)
+		}
+		return nil, nil
+	}, func(v any) (any, error) {
+		t.Errorf("Promise should not be rejected, got reason: %v", v)
+		return nil, nil
+	})
+}
+
 // 测试Then方法的基本功能 - 成功回调
 func TestPromiseThenFulfilled(t *testing.T) {
 	p1 := pm.New(func(resolve, reject func(any)) error {
@@ -160,6 +220,16 @@ func TestPromiseThenCallbackError(t *testing.T) {
 	p1.Then(func(v any) (any, error) {
 		return "callback error", errors.New("error")
 	}, nil).Then(nil, func(v any) (any, error) {
+		if v != "callback error" {
+			t.Errorf("Expected error value 'callback error', got %v", v)
+		}
+		return nil, nil
+	})
+
+	p2 := pm.Reject("error")
+	p2.Then(nil, func(v any) (any, error) {
+		return "callback error", errors.New("error")
+	}).Then(nil, func(v any) (any, error) {
 		if v != "callback error" {
 			t.Errorf("Expected error value 'callback error', got %v", v)
 		}
@@ -370,6 +440,19 @@ func TestPromiseAllEmptyArray(t *testing.T) {
 	})
 }
 
+// 测试All方法 - nil数组
+func TestPromiseAllNilArray(t *testing.T) {
+	pm.All(nil).Then(func(v any) (any, error) {
+		t.Errorf("Promise.All with nil array should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		if v != "TypeError: nil is not iterable" {
+			t.Errorf("Expected error value 'TypeError: nil is not iterable', got %v", v)
+		}
+		return nil, nil
+	})
+}
+
 // 测试AllSettled方法
 func TestPromiseAllSettled(t *testing.T) {
 
@@ -424,6 +507,19 @@ func TestPromiseAllSettledEmptyArray(t *testing.T) {
 		return nil, nil
 	}, func(v any) (any, error) {
 		t.Errorf("Promise.AllSettled should be fulfilled, but was rejected with %v", v)
+		return nil, nil
+	})
+}
+
+// 测试AllSettled方法 - nil数组
+func TestPromiseAllSettledNilArray(t *testing.T) {
+	pm.AllSettled(nil).Then(func(v any) (any, error) {
+		t.Errorf("Promise.AllSettled with nil array should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		if v != "TypeError: nil is not iterable" {
+			t.Errorf("Expected error value 'TypeError: nil is not iterable', got %v", v)
+		}
 		return nil, nil
 	})
 }
@@ -499,6 +595,19 @@ func TestPromiseAnyEmptyArray(t *testing.T) {
 		if len(agg["errors"].([]any)) != 0 {
 			t.Errorf("Expected 0 errors, got %d", len(agg["errors"].([]any)))
 			return nil, nil
+		}
+		return nil, nil
+	})
+}
+
+// 测试Any方法 - nil数组
+func TestPromiseAnyNilArray(t *testing.T) {
+	pm.Any(nil).Then(func(v any) (any, error) {
+		t.Errorf("Promise.Any with nil array should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		if v != "TypeError: nil is not iterable" {
+			t.Errorf("Expected error value 'TypeError: nil is not iterable', got %v", v)
 		}
 		return nil, nil
 	})
@@ -591,6 +700,19 @@ func TestPromiseRaceEmptyArray(t *testing.T) {
 			t.Errorf("Expected state Pending for empty array Race, got %s", state)
 		}
 	}()
+}
+
+// 测试Race方法 - nil数组
+func TestPromiseRaceNilArray(t *testing.T) {
+	pm.Race(nil).Then(func(v any) (any, error) {
+		t.Errorf("Promise.Race with nil array should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		if v != "TypeError: nil is not iterable" {
+			t.Errorf("Expected error value 'TypeError: nil is not iterable', got %v", v)
+		}
+		return nil, nil
+	})
 }
 
 // 测试Resolve方法 - 普通值
