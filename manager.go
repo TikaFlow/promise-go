@@ -1,22 +1,25 @@
 package promise
 
 import (
-	ip "github.com/TikaFlow/promise-go/ipromise"
 	"sync/atomic"
 	"time"
+
+	"github.com/TikaFlow/promise-go/ipromise"
 )
 
 var (
 	taskQuene      chan func()   = make(chan func(), 1024*10)
 	microtaskQuene chan func()   = make(chan func(), 1024*10)
-	timeout        time.Duration = time.Millisecond * 512
+	originTimeout  time.Duration = time.Millisecond * 512
+	timeout        time.Duration = originTimeout
 	margin         time.Duration = time.Millisecond * 128
-	timer          *time.Timer   = time.NewTimer(timeout + margin)
+	loopTimer      *time.Timer   = time.NewTimer(timeout + margin)
 	done           chan struct{} = make(chan struct{})
-	magic          time.Duration = 86413*time.Second + margin
+	magic          time.Duration = 86413 * time.Second
 )
 
 func init() {
+	go scheduleTask()
 	go startEventLoop()
 }
 
@@ -25,13 +28,15 @@ func closeFn() {
 }
 
 // New 创建一个新的 Promise 实例。
-func New(exec ip.Executor) ip.Promise {
+// executor 执行器函数，用于定义 Promise 的异步操作。
+// 返回一个新的 Promise 实例。
+func New(exec ipromise.Executor) ipromise.Promise {
 	if exec == nil {
 		panic("Promise executor must be a function")
 	}
 
 	prom := &promiseImpl{
-		state:           ip.Pending,
+		state:           ipromise.Pending,
 		value:           nil,
 		settledHandlers: make(chan *handler, 128),
 		done:            make(chan struct{}),
@@ -62,7 +67,7 @@ func New(exec ip.Executor) ip.Promise {
 // All 等待所有 Promise 解决。
 // 如果所有 Promise 都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有 Promise 解决值的数组；
 // 如果任何一个 Promise 被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的 Promise 的拒绝理由。
-func All(proms []ip.Promise) ip.Promise {
+func All(proms []ipromise.Promise) ipromise.Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -73,35 +78,27 @@ func All(proms []ip.Promise) ip.Promise {
 	return New(func(resolve, reject func(v any)) error {
 		results := make([]any, len(proms))
 		var count int32 = 0
-		// 使用闭包变量来防止多次resolve/reject
 		resolved := false
 		rejected := false
 
-		// 将异步处理逻辑放入微队列
 		QueueMicrotask(func() {
-			// 遍历所有Promise并处理它们的结果
 			for i, prom := range proms {
-				go func(index int, p ip.Promise) {
+				go func(index int, p ipromise.Promise) {
 					state, value := Wait(p)
 
-					// 检查是否已经有结果
 					if rejected || resolved {
 						return
 					}
 
-					if state == ip.Rejected {
-						// 如果有任何Promise被拒绝，立即拒绝新Promise
+					if state == ipromise.Rejected {
 						rejected = true
 						reject(value)
 						return
 					}
 
-					// 存储已完成的Promise结果
 					results[index] = value
 
-					// 使用原子操作增加计数器 - 原子累加确保在并发环境中计数准确，避免竞态条件
 					if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) && !rejected {
-						// 所有Promise都已完成，resolve新Promise
 						resolved = true
 						resolve(results)
 					}
@@ -115,7 +112,7 @@ func All(proms []ip.Promise) ip.Promise {
 
 // AllSettled 等待所有 Promise 完成（无论成功失败）。
 // 新 Promise 会在所有 Promise 完成后解决，解决值为一个包含所有 Promise 完成状态和结果的数组。
-func AllSettled(proms []ip.Promise) ip.Promise {
+func AllSettled(proms []ipromise.Promise) ipromise.Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -124,7 +121,6 @@ func AllSettled(proms []ip.Promise) ip.Promise {
 	}
 
 	return New(func(resolve, reject func(v any)) error {
-		// 定义结果结构，包含status和value/reason
 		type result struct {
 			Status string
 			Value  any
@@ -133,28 +129,23 @@ func AllSettled(proms []ip.Promise) ip.Promise {
 
 		results := make([]result, len(proms))
 		var count int32 = 0
-		// 将异步处理逻辑放入微队列
 		QueueMicrotask(func() {
-			// 遍历所有Promise并处理它们的结果
 			for i, prom := range proms {
-				go func(index int, p ip.Promise) {
+				go func(index int, p ipromise.Promise) {
 					state, value := Wait(p)
 
-					// 无论成功失败都记录结果
-					if state == ip.Fulfilled {
-						results[index] = result{Status: ip.Fulfilled, Value: value}
+					if state == ipromise.Fulfilled {
+						results[index] = result{Status: ipromise.Fulfilled, Value: value}
 					} else {
-						results[index] = result{Status: ip.Rejected, Reason: value}
+						results[index] = result{Status: ipromise.Rejected, Reason: value}
 					}
 
-					// 使用原子操作增加计数器 - 原子累加确保在并发环境中计数准确，避免竞态条件
 					if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
-						// 将result结构转换为map格式
 						finalResults := make([]map[string]any, len(results))
 						for i, r := range results {
 							finalResults[i] = make(map[string]any)
 							finalResults[i]["status"] = r.Status
-							if r.Status == ip.Fulfilled {
+							if r.Status == ipromise.Fulfilled {
 								finalResults[i]["value"] = r.Value
 							} else {
 								finalResults[i]["reason"] = r.Reason
@@ -173,7 +164,7 @@ func AllSettled(proms []ip.Promise) ip.Promise {
 // Any 等待第一个 Promise 解决。
 // 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的 Promise 的解决值。
 // 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的数组。
-func Any(proms []ip.Promise) ip.Promise {
+func Any(proms []ipromise.Promise) ipromise.Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -188,33 +179,26 @@ func Any(proms []ip.Promise) ip.Promise {
 	return New(func(resolve, reject func(v any)) error {
 		reasons := make([]any, len(proms))
 		var count int32 = 0
-		// 使用闭包变量来防止多次resolve/reject
 		resolved := false
 		rejected := false
 
-		// 将异步处理逻辑放入微队列
 		QueueMicrotask(func() {
-			// 遍历所有Promise并处理它们的结果
 			for i, prom := range proms {
-				go func(index int, p ip.Promise) {
+				go func(index int, p ipromise.Promise) {
 					state, value := Wait(p)
 
-					// 检查是否已经有结果
 					if rejected || resolved {
 						return
 					}
 
-					if state == ip.Fulfilled {
-						// 如果有任何Promise被满足，立即resolve新Promise
+					if state == ipromise.Fulfilled {
 						resolved = true
 						resolve(value)
 						return
 					}
 
-					// 记录拒绝原因
 					reasons[index] = value
 
-					// 使用原子操作增加计数器 - 原子累加确保在并发环境中计数准确，避免竞态条件
 					if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) && !resolved {
 						// 所有Promise都被拒绝，拒绝新Promise
 						rejected = true
@@ -234,37 +218,29 @@ func Any(proms []ip.Promise) ip.Promise {
 
 // Race 等待第一个 Promise 完成。
 // 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由为第一个完成的 Promise 的解决值或拒绝理由。
-func Race(proms []ip.Promise) ip.Promise {
+func Race(proms []ipromise.Promise) ipromise.Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
 
 	return New(func(resolve, reject func(v any)) error {
-		// 处理空数组情况
 		if len(proms) == 0 {
-			// 空数组永远不会解决或拒绝，返回一个pending状态的Promise
 			return nil
 		}
 
-		// 使用闭包变量来防止多次resolve/reject
 		settled := false
 
-		// 将异步处理逻辑放入微队列
 		QueueMicrotask(func() {
-			// 遍历所有Promise，任何一个完成就决定新Promise的状态
 			for _, prom := range proms {
-				go func(p ip.Promise) {
-					// 等待Promise完成
+				go func(p ipromise.Promise) {
 					state, value := Wait(p)
 
-					// 检查是否已经有结果
 					if settled {
 						return
 					}
 
-					// 根据第一个完成的Promise状态决定新Promise状态
 					settled = true
-					if state == ip.Fulfilled {
+					if state == ipromise.Fulfilled {
 						resolve(value)
 					} else {
 						reject(value)
@@ -280,13 +256,12 @@ func Race(proms []ip.Promise) ip.Promise {
 // Resolve 返回一个已解决的 Promise，解决值为指定值。
 // 如果值已经是 Promise，则直接返回该 Promise。
 // ref: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/resolve
-func Resolve(value any) ip.Promise {
+func Resolve(value any) ipromise.Promise {
 	// 如果值已经是Promise，直接返回
-	if prom, ok := value.(ip.Promise); ok {
+	if prom, ok := value.(ipromise.Promise); ok {
 		return prom
 	}
 
-	// 创建一个已解决的Promise
 	return New(func(resolve, reject func(v any)) error {
 		resolve(value)
 		return nil
@@ -295,15 +270,15 @@ func Resolve(value any) ip.Promise {
 
 // Reject 返回一个已拒绝的 Promise，拒绝理由为指定值。
 // ref: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
-func Reject(reason any) ip.Promise {
-	// 创建一个已拒绝的Promise
+func Reject(reason any) ipromise.Promise {
 	return New(func(resolve, reject func(v any)) error {
 		reject(reason)
 		return nil
 	})
 }
 
-func Try(fn func(...any) (any, error), args ...any) ip.Promise {
+// Try 接受一个任意类型的回调函数（无论其是同步或异步，返回结果或抛出异常），并将其结果封装成一个 Promise。
+func Try(fn func(...any) (any, error), args ...any) ipromise.Promise {
 	return New(func(resolve, reject func(v any)) error {
 		if fn == nil {
 			reject("Promise executor must be a function")
@@ -320,10 +295,11 @@ func Try(fn func(...any) (any, error), args ...any) ip.Promise {
 	})
 }
 
-// PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve 和 reject 函数。
+// PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve 和 reject 函数，
+// 对应于传入给 Promise() 构造函数执行器的两个参数。
 // 这使得可以在 Promise 外部手动解决或拒绝 Promise。
 // ref: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
-func PromiseWithResolvers() (ip.Promise, func(any), func(any)) {
+func PromiseWithResolvers() (ipromise.Promise, func(any), func(any)) {
 	var resolve, reject func(any)
 	p := New(func(res func(any), rej func(any)) error {
 		resolve = res
@@ -333,74 +309,10 @@ func PromiseWithResolvers() (ip.Promise, func(any), func(any)) {
 	return p, resolve, reject
 }
 
-// SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数。
-// cb 回调函数
-// millis 毫秒数
-// 返回一个通道，可通过调用 ClearTimeout 函数来清除定时器。
-func SetTimeout(cb func(), millis int64) chan struct{} {
-	delay := abs(millis)
-
-	originTimeout := timeout
-	if delay > timeout.Milliseconds() {
-		timeout = time.Duration(delay)*time.Millisecond + margin
-		resetTimer()
-	}
-
-	ch := make(chan struct{})
-	go func() {
-		select {
-		case <-ch:
-			return
-		case <-time.After(time.Duration(delay) * time.Millisecond):
-			timeout = originTimeout
-			queueTask(cb)
-		}
-	}()
-
-	return ch
-}
-
-// SetInterval 模拟 setInterval 函数，在指定毫秒数后重复调用回调函数。
-// cb 回调函数
-// millis 毫秒数
-// 返回一个通道，可通过调用 ClearInterval 函数来清除定时器。
-func SetInterval(cb func(), millis int64) chan struct{} {
-	delay := abs(millis)
-
-	ch := make(chan struct{})
-	var fn func()
-	fn = func() {
-		select {
-		case <-ch:
-			return
-		default:
-			cb()
-			SetTimeout(fn, delay)
-		}
-	}
-
-	tch := SetTimeout(fn, delay)
-	go func() {
-		select {
-		case <-ch:
-			close(tch)
-		case <-time.After(time.Duration(delay) * time.Millisecond):
-		}
-	}()
-
-	return ch
-}
-
-// ClearTimeout 清除由 SetTimeout 函数创建的定时器。
-// ch 定时器通道
-func ClearTimeout(ch chan struct{}) {
-	close(ch)
-}
-
-// ClearInterval 清除由 SetInterval 函数创建的定时器。
-// ch 定时器通道
-func ClearInterval(ch chan struct{}) {
-	close(ch)
+// QueueMicrotask 将回调函数添加到微任务队列末尾。
+func QueueMicrotask(fn func()) {
+	microtaskQuene <- fn
+	resetLoopTimer()
 }
 
 // ====== 辅助函数 ======
@@ -409,7 +321,7 @@ func resolve(prom *promiseImpl, value any) {
 		return
 	}
 
-	if prom.state != ip.Pending {
+	if prom.state != ipromise.Pending {
 		return
 	}
 
@@ -420,7 +332,7 @@ func resolve(prom *promiseImpl, value any) {
 	}
 
 	// 2.3.2
-	if x, ok := value.(ip.Promise); ok {
+	if x, ok := value.(ipromise.Promise); ok {
 		// 2.3.2 如果已决值是 Promise 对象，则采用其状态
 		QueueMicrotask(func() {
 			x.Then(func(v any) (any, error) {
@@ -436,7 +348,7 @@ func resolve(prom *promiseImpl, value any) {
 	// 2.3.3 同上
 
 	// 2.3.4 其他情况，则使用 value 作为已决值
-	prom.state = ip.Fulfilled
+	prom.state = ipromise.Fulfilled
 	prom.value = value
 	close(prom.done)
 	QueueMicrotask(func() {
@@ -449,11 +361,11 @@ func reject(prom *promiseImpl, reason any) {
 		return
 	}
 
-	if prom.state != ip.Pending {
+	if prom.state != ipromise.Pending {
 		return
 	}
 
-	prom.state = ip.Rejected
+	prom.state = ipromise.Rejected
 	prom.value = reason
 	close(prom.done)
 	QueueMicrotask(func() {
@@ -463,23 +375,17 @@ func reject(prom *promiseImpl, reason any) {
 
 func queueTask(fn func()) {
 	taskQuene <- fn
-	resetTimer()
+	resetLoopTimer()
 }
 
-// QueueMicrotask 将回调函数添加到微任务队列末尾。
-func QueueMicrotask(fn func()) {
-	microtaskQuene <- fn
-	resetTimer()
-}
-
-func resetTimer() {
-	if timer.Stop() {
+func resetLoopTimer() {
+	if !loopTimer.Stop() {
 		select {
-		case <-timer.C:
+		case <-loopTimer.C:
 		default:
 		}
 	}
-	timer.Reset(timeout)
+	loopTimer.Reset(timeout + margin)
 }
 
 func flushHandlers(cur *promiseImpl) {
@@ -490,7 +396,7 @@ func flushHandlers(cur *promiseImpl) {
 
 			var res any
 			var err error
-			if cur.state == ip.Fulfilled {
+			if cur.state == ipromise.Fulfilled {
 				if hdl.onFulfilled == nil {
 					// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.3）
 					resolve(hdl.prom, cur.value)
@@ -528,35 +434,30 @@ func flushHandlers(cur *promiseImpl) {
 	}
 }
 
-func abs(millis int64) int64 {
-	switch {
-	case millis >= 0:
-		return millis
-	case millis == (-1 << 63):
-		return 1<<63 - 1
-	default:
-		return -millis
-	}
-}
-
 // ====== 辅助函数【结束】 ======
 
 // Wait 同步阻塞等待 Promise 完成并返回其状态和值。
-func Wait(prom ip.Promise) (state string, value any) {
+func Wait(prom ipromise.Promise) (state string, value any) {
 	<-prom.Done()
 	return prom.State(), prom.Result()
 }
 
+// GetCloseFn 返回一个关闭函数，调用后会关闭事件循环。
+// 获取此函数后，必须调用此函数来结束事件循环，否则将不会停止。
 func GetCloseFn() func() {
-	if timeout != magic {
-		// 第一次获取关闭函数
+	if timeout < magic {
 		timeout = magic
-		resetTimer()
-		// 无限重置 => 永不过期
+		originTimeout = magic
+		resetLoopTimer()
+
 		go func() {
 			for {
-				<-time.After(time.Hour * 24)
-				resetTimer()
+				select {
+				case <-time.After(time.Hour * 24):
+					resetLoopTimer()
+				case <-done:
+					return
+				}
 			}
 		}()
 	}
@@ -569,31 +470,33 @@ loop:
 	for {
 		select {
 		case mtask := <-microtaskQuene:
-			resetTimer()
+			resetLoopTimer()
 			mtask()
-			resetTimer()
+			resetLoopTimer()
 		default:
 			select {
 			case task := <-taskQuene:
-				resetTimer()
+				resetLoopTimer()
 				task()
-				resetTimer()
+				resetLoopTimer()
 			default:
 				select {
 				case mtask := <-microtaskQuene:
-					resetTimer()
+					resetLoopTimer()
 					mtask()
-					resetTimer()
+					resetLoopTimer()
 				case task := <-taskQuene:
-					resetTimer()
+					resetLoopTimer()
 					task()
-					resetTimer()
+					resetLoopTimer()
 				case <-done:
 					break loop
-				case <-timer.C:
+				case <-loopTimer.C:
 					break loop
 				}
 			}
 		}
 	}
+
+	close(schedulerDone)
 }

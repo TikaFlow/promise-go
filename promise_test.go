@@ -969,12 +969,7 @@ func TestSetTimeoutNegativeMillis(t *testing.T) {
 		str = "timeout value"
 	}, -100)
 
-	time.Sleep(80 * time.Millisecond)
-	if str != "" {
-		t.Errorf("Expected str '', got %s", str)
-	}
-
-	time.Sleep(40 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 	if str != "timeout value" {
 		t.Errorf("Expected str 'timeout value', got %s", str)
 	}
@@ -1015,13 +1010,13 @@ func TestSetTimeoutLongDelay(t *testing.T) {
 func TestSetInterval(t *testing.T) {
 	var str string
 	var count int
-	var ch chan struct{}
+	var id int
 
-	ch = promise.SetInterval(func() {
+	id = promise.SetInterval(func() {
 		str += "interval "
 		count++
 		if count >= 3 {
-			promise.ClearInterval(ch)
+			promise.ClearInterval(id)
 		}
 	}, 200)
 
@@ -1058,18 +1053,18 @@ func TestSetInterval(t *testing.T) {
 func TestSetIntervalCancelFirst(t *testing.T) {
 	var str string
 	var count int
-	var ch chan struct{}
+	var id int
 
-	ch = promise.SetInterval(func() {
+	id = promise.SetInterval(func() {
 		str += "interval "
 		count++
 		if count >= 3 {
-			promise.ClearInterval(ch)
+			promise.ClearInterval(id)
 		}
 	}, 200)
 
 	time.Sleep(20 * time.Millisecond)
-	promise.ClearInterval(ch)
+	promise.ClearInterval(id)
 	time.Sleep(200 * time.Millisecond)
 	if str != "" {
 		t.Errorf("Expected str '', got %s", str)
@@ -1080,13 +1075,13 @@ func TestSetIntervalCancelFirst(t *testing.T) {
 func TestSetIntervalCancelNonFirst(t *testing.T) {
 	var str string
 	var count int
-	var ch chan struct{}
+	var id int
 
-	ch = promise.SetInterval(func() {
+	id = promise.SetInterval(func() {
 		str += "interval "
 		count++
 		if count >= 3 {
-			promise.ClearInterval(ch)
+			promise.ClearInterval(id)
 		}
 	}, 200)
 
@@ -1095,7 +1090,7 @@ func TestSetIntervalCancelNonFirst(t *testing.T) {
 	if str != "interval " {
 		t.Errorf("Expected str 'interval ', got %s", str)
 	}
-	promise.ClearInterval(ch)
+	promise.ClearInterval(id)
 	time.Sleep(400 * time.Millisecond)
 	if str != "interval " {
 		t.Errorf("Expected str 'interval ', got %s", str)
@@ -1105,14 +1100,14 @@ func TestSetIntervalCancelNonFirst(t *testing.T) {
 // 测试 SetInterval 函数 - 长延迟
 func TestSetIntervalLongDelay(t *testing.T) {
 	var str string
-	var count int
-	var ch chan struct{}
+	var id int
 
-	ch = promise.SetInterval(func() {
+	count := 0
+	id = promise.SetInterval(func() {
 		str += "interval "
 		count++
 		if count >= 3 {
-			promise.ClearInterval(ch)
+			promise.ClearInterval(id)
 		}
 	}, 1000)
 
@@ -1146,7 +1141,6 @@ func TestSetIntervalLongDelay(t *testing.T) {
 }
 
 // 测试异步调用顺序
-// FIXME: 测试结果与预期不符
 func TestAsyncCallOrder(t *testing.T) {
 	// 创建结果字符串，用于记录执行顺序
 	var result string
@@ -1321,12 +1315,12 @@ func TestAsyncCallOrder(t *testing.T) {
 
 	// setInterval - 宏任务 5
 	count := 1
-	var intervalCh chan struct{}
-	intervalCh = promise.SetInterval(func() {
+	var id int
+	id = promise.SetInterval(func() {
 		appendResult("31")
 
 		if count >= 2 {
-			promise.ClearInterval(intervalCh)
+			promise.ClearInterval(id)
 		}
 		count++
 
