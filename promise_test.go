@@ -8,13 +8,9 @@ import (
 	"time"
 )
 
-var (
-	pm *promise.PromiseManager
-)
-
 // 测试Promise的基本创建和解决
 func TestPromiseBasicResolve(t *testing.T) {
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -33,7 +29,7 @@ func TestPromiseBasicResolve(t *testing.T) {
 
 // 测试Promise的基本创建和拒绝
 func TestPromiseBasicReject(t *testing.T) {
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		reject("failure")
 		return nil
 	})
@@ -54,7 +50,7 @@ func TestPromiseBasicReject(t *testing.T) {
 func TestPromiseExecutorError(t *testing.T) {
 	errorMsg := "executor error"
 
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		return errors.New(errorMsg)
 	})
 
@@ -82,20 +78,20 @@ func TestPromiseNilExecutor(t *testing.T) {
 		}
 	}()
 
-	pm.New(nil)
+	promise.New(nil)
 	// 注意：由于执行器为nil会立即panic，所以不需要RunLoop和等待
 }
 
 // 测试执行器中多次调用resolve或reject
 func TestPromiseExecutorMultipleCalls(t *testing.T) {
-	slowProm := pm.New(func(resolve, reject func(any)) error {
+	slowProm := promise.New(func(resolve, reject func(any)) error {
 		go func() {
 			time.Sleep(200 * time.Millisecond)
 			resolve("slow")
 		}()
 		return nil
 	})
-	fastProm := pm.New(func(resolve, reject func(any)) error {
+	fastProm := promise.New(func(resolve, reject func(any)) error {
 		go func() {
 			time.Sleep(100 * time.Millisecond)
 			resolve("fast")
@@ -103,7 +99,7 @@ func TestPromiseExecutorMultipleCalls(t *testing.T) {
 		return nil
 	})
 
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		resolve(slowProm)
 		reject(fastProm)
 		return nil
@@ -122,7 +118,7 @@ func TestPromiseExecutorMultipleCalls(t *testing.T) {
 
 // 测试执行器在resolve或reject已调用后报错
 func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
-	delayResolve := pm.New(func(resolve, reject func(any)) error {
+	delayResolve := promise.New(func(resolve, reject func(any)) error {
 		go func() {
 			time.Sleep(100 * time.Millisecond)
 			resolve("success")
@@ -130,7 +126,7 @@ func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
 		return nil
 	})
 
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		resolve(delayResolve)
 		return errors.New("executor error after resolve")
 	})
@@ -148,7 +144,7 @@ func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
 
 // 测试Then方法的基本功能 - 成功回调
 func TestPromiseThenFulfilled(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
@@ -165,7 +161,7 @@ func TestPromiseThenFulfilled(t *testing.T) {
 
 // 测试Then方法的基本功能 - 拒绝回调
 func TestPromiseThenRejected(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
@@ -182,7 +178,7 @@ func TestPromiseThenRejected(t *testing.T) {
 
 // 测试Then方法的穿透 - 成功状态
 func TestPromiseThenPassThroughFulfilled(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve("value")
 		return nil
 	})
@@ -197,7 +193,7 @@ func TestPromiseThenPassThroughFulfilled(t *testing.T) {
 
 // 测试Then方法的穿透 - 拒绝状态
 func TestPromiseThenPassThroughRejected(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		reject("reason")
 		return nil
 	})
@@ -212,7 +208,7 @@ func TestPromiseThenPassThroughRejected(t *testing.T) {
 
 // 测试Then方法回调函数抛出错误
 func TestPromiseThenCallbackError(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve("value")
 		return nil
 	})
@@ -226,7 +222,7 @@ func TestPromiseThenCallbackError(t *testing.T) {
 		return nil, nil
 	})
 
-	p2 := pm.Reject("error")
+	p2 := promise.Reject("error")
 	p2.Then(nil, func(v any) (any, error) {
 		return "callback error", errors.New("error")
 	}).Then(nil, func(v any) (any, error) {
@@ -239,7 +235,7 @@ func TestPromiseThenCallbackError(t *testing.T) {
 
 // 测试Then方法链式调用
 func TestPromiseThenChaining(t *testing.T) {
-	pm.New(func(resolve, reject func(any)) error {
+	promise.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	}).Then(func(v any) (any, error) {
@@ -256,7 +252,7 @@ func TestPromiseThenChaining(t *testing.T) {
 
 // 测试Catch方法
 func TestPromiseCatch(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
@@ -275,7 +271,7 @@ func TestPromiseCatch(t *testing.T) {
 func TestPromiseFinallyFulfilled(t *testing.T) {
 	finallyCalled := false
 
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -298,7 +294,7 @@ func TestPromiseFinallyFulfilled(t *testing.T) {
 func TestPromiseFinallyRejected(t *testing.T) {
 	finallyCalled := false
 
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
@@ -319,7 +315,7 @@ func TestPromiseFinallyRejected(t *testing.T) {
 
 // 测试Finally方法抛出错误
 func TestPromiseFinallyError(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -339,12 +335,12 @@ func TestPromiseFinallyError(t *testing.T) {
 
 // 测试Finally方法返回被拒绝的Promise
 func TestPromiseFinallyReturnsRejectedPromise(t *testing.T) {
-	rejectedPromise := pm.New(func(resolve, reject func(any)) error {
+	rejectedPromise := promise.New(func(resolve, reject func(any)) error {
 		reject("rejected from finally")
 		return nil
 	})
 
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
@@ -364,20 +360,20 @@ func TestPromiseFinallyReturnsRejectedPromise(t *testing.T) {
 
 // 测试All方法 - 所有Promise都成功
 func TestPromiseAllFulfilled(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		resolve(2)
 		return nil
 	})
-	p3 := pm.New(func(resolve, reject func(any)) error {
+	p3 := promise.New(func(resolve, reject func(any)) error {
 		resolve(3)
 		return nil
 	})
 
-	pm.All([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	promise.All([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		results, ok := v.([]any)
 		if !ok {
 			t.Errorf("Expected []any type, got %T", v)
@@ -397,20 +393,20 @@ func TestPromiseAllFulfilled(t *testing.T) {
 
 // 测试All方法 - 有一个Promise被拒绝
 func TestPromiseAllRejected(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
-	p3 := pm.New(func(resolve, reject func(any)) error {
+	p3 := promise.New(func(resolve, reject func(any)) error {
 		resolve(3)
 		return nil
 	})
 
-	pm.All([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	promise.All([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.All should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -423,7 +419,7 @@ func TestPromiseAllRejected(t *testing.T) {
 
 // 测试All方法 - 空数组
 func TestPromiseAllEmptyArray(t *testing.T) {
-	allPromise := pm.All([]ip.Promise{})
+	allPromise := promise.All([]ip.Promise{})
 
 	allPromise.Then(func(v any) (any, error) {
 		results, ok := v.([]any)
@@ -442,7 +438,7 @@ func TestPromiseAllEmptyArray(t *testing.T) {
 
 // 测试All方法 - nil数组
 func TestPromiseAllNilArray(t *testing.T) {
-	pm.All(nil).Then(func(v any) (any, error) {
+	promise.All(nil).Then(func(v any) (any, error) {
 		t.Errorf("Promise.All with nil array should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -456,20 +452,20 @@ func TestPromiseAllNilArray(t *testing.T) {
 // 测试AllSettled方法
 func TestPromiseAllSettled(t *testing.T) {
 
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
 	})
-	p3 := pm.New(func(resolve, reject func(any)) error {
+	p3 := promise.New(func(resolve, reject func(any)) error {
 		resolve(3)
 		return nil
 	})
 
-	pm.AllSettled([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	promise.AllSettled([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		results, ok := v.([]map[string]any)
 		if !ok {
 			t.Errorf("Expected []map[string]any type, got %T", v)
@@ -496,7 +492,7 @@ func TestPromiseAllSettled(t *testing.T) {
 
 // 测试AllSettled方法 - 空数组
 func TestPromiseAllSettledEmptyArray(t *testing.T) {
-	pm.AllSettled([]ip.Promise{}).Then(func(v any) (any, error) {
+	promise.AllSettled([]ip.Promise{}).Then(func(v any) (any, error) {
 		results, ok := v.([]map[string]any)
 		if !ok {
 			t.Errorf("Expected []map[string]any type, got %T", v)
@@ -513,7 +509,7 @@ func TestPromiseAllSettledEmptyArray(t *testing.T) {
 
 // 测试AllSettled方法 - nil数组
 func TestPromiseAllSettledNilArray(t *testing.T) {
-	pm.AllSettled(nil).Then(func(v any) (any, error) {
+	promise.AllSettled(nil).Then(func(v any) (any, error) {
 		t.Errorf("Promise.AllSettled with nil array should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -526,20 +522,20 @@ func TestPromiseAllSettledNilArray(t *testing.T) {
 
 // 测试Any方法 - 有一个Promise成功
 func TestPromiseAnyFulfilled(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		reject("error1")
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
 	})
-	p3 := pm.New(func(resolve, reject func(any)) error {
+	p3 := promise.New(func(resolve, reject func(any)) error {
 		reject("error2")
 		return nil
 	})
 
-	pm.Any([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
+	promise.Any([]ip.Promise{p1, p2, p3}).Then(func(v any) (any, error) {
 		if v != "success" {
 			t.Errorf("Expected value 'success', got %v", v)
 		}
@@ -552,16 +548,16 @@ func TestPromiseAnyFulfilled(t *testing.T) {
 
 // 测试Any方法 - 所有Promise都失败
 func TestPromiseAnyAllRejected(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		reject("error1")
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		reject("error2")
 		return nil
 	})
 
-	pm.Any([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
+	promise.Any([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Any should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -583,7 +579,7 @@ func TestPromiseAnyAllRejected(t *testing.T) {
 
 // 测试Any方法 - 空数组
 func TestPromiseAnyEmptyArray(t *testing.T) {
-	pm.Any([]ip.Promise{}).Then(func(v any) (any, error) {
+	promise.Any([]ip.Promise{}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Any with empty array should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -602,7 +598,7 @@ func TestPromiseAnyEmptyArray(t *testing.T) {
 
 // 测试Any方法 - nil数组
 func TestPromiseAnyNilArray(t *testing.T) {
-	pm.Any(nil).Then(func(v any) (any, error) {
+	promise.Any(nil).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Any with nil array should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -615,7 +611,7 @@ func TestPromiseAnyNilArray(t *testing.T) {
 
 // 测试Race方法 - 第一个完成的是成功的Promise
 func TestPromiseRaceFulfilled(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较长
@@ -624,7 +620,7 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 		}()
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较短
@@ -634,7 +630,7 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 		return nil
 	})
 
-	pm.Race([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
+	promise.Race([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
 		if v != "success" {
 			t.Errorf("Expected value 'success', got %v", v)
 		}
@@ -647,7 +643,7 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 
 // 测试Race方法 - 第一个完成的是失败的Promise
 func TestPromiseRaceRejected(t *testing.T) {
-	p1 := pm.New(func(resolve, reject func(any)) error {
+	p1 := promise.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较短
@@ -656,7 +652,7 @@ func TestPromiseRaceRejected(t *testing.T) {
 		}()
 		return nil
 	})
-	p2 := pm.New(func(resolve, reject func(any)) error {
+	p2 := promise.New(func(resolve, reject func(any)) error {
 		// 使用goroutine模拟异步延迟
 		go func() {
 			// 等待时间较长
@@ -666,7 +662,7 @@ func TestPromiseRaceRejected(t *testing.T) {
 		return nil
 	})
 
-	pm.Race([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
+	promise.Race([]ip.Promise{p1, p2}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Race should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -679,7 +675,7 @@ func TestPromiseRaceRejected(t *testing.T) {
 
 // 测试Race方法 - 空数组
 func TestPromiseRaceEmptyArray(t *testing.T) {
-	racePromise := pm.Race([]ip.Promise{})
+	racePromise := promise.Race([]ip.Promise{})
 
 	go func() {
 		// 空数组的Race应该返回一个pending状态的Promise
@@ -704,7 +700,7 @@ func TestPromiseRaceEmptyArray(t *testing.T) {
 
 // 测试Race方法 - nil数组
 func TestPromiseRaceNilArray(t *testing.T) {
-	pm.Race(nil).Then(func(v any) (any, error) {
+	promise.Race(nil).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Race with nil array should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -717,7 +713,7 @@ func TestPromiseRaceNilArray(t *testing.T) {
 
 // 测试Resolve方法 - 普通值
 func TestPromiseResolve(t *testing.T) {
-	pm.Resolve("value").Then(func(v any) (any, error) {
+	promise.Resolve("value").Then(func(v any) (any, error) {
 		if v != "value" {
 			t.Errorf("Expected value 'value', got %v", v)
 		}
@@ -730,12 +726,12 @@ func TestPromiseResolve(t *testing.T) {
 
 // 测试Resolve方法 - Promise对象
 func TestPromiseResolvePromise(t *testing.T) {
-	original := pm.New(func(resolve, reject func(any)) error {
+	original := promise.New(func(resolve, reject func(any)) error {
 		resolve("original")
 		return nil
 	})
 
-	p := pm.Resolve(original)
+	p := promise.Resolve(original)
 
 	if p != original {
 		t.Errorf("Expected Resolve to return the same Promise instance")
@@ -754,7 +750,7 @@ func TestPromiseResolvePromise(t *testing.T) {
 
 // 测试Reject方法
 func TestPromiseReject(t *testing.T) {
-	pm.Reject("reason").Then(func(v any) (any, error) {
+	promise.Reject("reason").Then(func(v any) (any, error) {
 		t.Errorf("Promise.Reject should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -767,7 +763,7 @@ func TestPromiseReject(t *testing.T) {
 
 // 测试Try方法 - 成功
 func TestPromiseTrySuccess(t *testing.T) {
-	pm.Try(func(args ...any) (any, error) {
+	promise.Try(func(args ...any) (any, error) {
 		return "success", nil
 	}).Then(func(v any) (any, error) {
 		if v != "success" {
@@ -782,7 +778,7 @@ func TestPromiseTrySuccess(t *testing.T) {
 
 // 测试Try方法 - 失败
 func TestPromiseTryError(t *testing.T) {
-	pm.Try(func(args ...any) (any, error) {
+	promise.Try(func(args ...any) (any, error) {
 		return "error value", errors.New("error")
 	}).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Try should be rejected, but was fulfilled with %v", v)
@@ -797,7 +793,7 @@ func TestPromiseTryError(t *testing.T) {
 
 // 测试Try方法 - nil函数
 func TestPromiseTryNilFunc(t *testing.T) {
-	pm.Try(nil).Then(func(v any) (any, error) {
+	promise.Try(nil).Then(func(v any) (any, error) {
 		t.Errorf("Promise.Try with nil func should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -815,10 +811,10 @@ func TestPromiseTryNilFunc(t *testing.T) {
 // 测试PromiseWithResolvers方法
 func TestPromiseWithResolvers(t *testing.T) {
 	// 测试成功情况
-	promise, resolve, _ := pm.PromiseWithResolvers()
+	p, resolve, _ := promise.PromiseWithResolvers()
 	resolve("resolved value")
 
-	promise.Then(func(v any) (any, error) {
+	p.Then(func(v any) (any, error) {
 		if v != "resolved value" {
 			t.Errorf("Expected value 'resolved value', got %v", v)
 		}
@@ -829,10 +825,10 @@ func TestPromiseWithResolvers(t *testing.T) {
 	})
 
 	// 测试拒绝情况
-	promise2, _, reject2 := pm.PromiseWithResolvers()
+	p2, _, reject2 := promise.PromiseWithResolvers()
 	reject2("rejected reason")
 
-	promise2.Then(func(v any) (any, error) {
+	p2.Then(func(v any) (any, error) {
 		t.Errorf("Promise should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v any) (any, error) {
@@ -845,7 +841,7 @@ func TestPromiseWithResolvers(t *testing.T) {
 
 // 测试循环引用检测
 func TestPromiseCycleDetection(t *testing.T) {
-	initial := pm.New(func(resolve, reject func(any)) error {
+	initial := promise.New(func(resolve, reject func(any)) error {
 		resolve("initial")
 		return nil
 	})
@@ -872,12 +868,12 @@ func TestPromiseCycleDetection(t *testing.T) {
 
 // 测试Thenable对象处理
 func TestPromiseThenable(t *testing.T) {
-	thenable := pm.New(func(resolve, reject func(any)) error {
+	thenable := promise.New(func(resolve, reject func(any)) error {
 		resolve("thenable value")
 		return nil
 	})
 
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		resolve(thenable)
 		return nil
 	})
@@ -895,7 +891,7 @@ func TestPromiseThenable(t *testing.T) {
 
 // 测试多个Then调用的顺序
 func TestPromiseMultipleThenOrder(t *testing.T) {
-	p := pm.New(func(resolve, reject func(any)) error {
+	p := promise.New(func(resolve, reject func(any)) error {
 		resolve("value")
 		return nil
 	})
@@ -932,10 +928,473 @@ func TestPromiseMultipleThenOrder(t *testing.T) {
 	})
 }
 
-func TestMain(m *testing.M) {
-	pm = promise.GetPromiseManager(time.Second)
-	m.Run()
+// 测试 SetTimeout 函数
+func TestSetTimeout(t *testing.T) {
+	var str string
+	promise.SetTimeout(func() {
+		str = "timeout value"
+	}, 100)
 
-	// 运行事件循环以处理微任务
-	pm.RunLoop(nil)
+	time.Sleep(80 * time.Millisecond)
+	if str != "" {
+		t.Errorf("Expected str '', got %s", str)
+	}
+
+	time.Sleep(40 * time.Millisecond)
+	if str != "timeout value" {
+		t.Errorf("Expected str 'timeout value', got %s", str)
+	}
+}
+
+// 测试 SetTimeout 函数 - 取消
+func TestSetTimeoutCancel(t *testing.T) {
+	p := promise.New(func(resolve, reject func(any)) error {
+		id := promise.SetTimeout(func() {
+			resolve("timeout value")
+		}, 100)
+		promise.ClearTimeout(id)
+		return nil
+	})
+
+	time.Sleep(120 * time.Millisecond)
+	if p.State() != ip.Pending {
+		t.Errorf("Expected state Pending, got %v", p.State())
+	}
+}
+
+// 测试 SetTimeout 函数 - 毫秒数为负数
+func TestSetTimeoutNegativeMillis(t *testing.T) {
+	var str string
+	promise.SetTimeout(func() {
+		str = "timeout value"
+	}, -100)
+
+	time.Sleep(80 * time.Millisecond)
+	if str != "" {
+		t.Errorf("Expected str '', got %s", str)
+	}
+
+	time.Sleep(40 * time.Millisecond)
+	if str != "timeout value" {
+		t.Errorf("Expected str 'timeout value', got %s", str)
+	}
+}
+
+// 测试 SetTimeout 函数 - 毫秒数为 0
+func TestSetTimeoutZeroMillis(t *testing.T) {
+	var str string
+	promise.SetTimeout(func() {
+		str = "timeout value"
+	}, 0)
+
+	time.Sleep(20 * time.Millisecond)
+	if str != "timeout value" {
+		t.Errorf("Expected str 'timeout value', got %s", str)
+	}
+}
+
+// 测试 SetTimeout 函数 - 长延迟
+func TestSetTimeoutLongDelay(t *testing.T) {
+	var str string
+	promise.SetTimeout(func() {
+		str = "timeout value"
+	}, 1000)
+
+	time.Sleep(980 * time.Millisecond)
+	if str != "" {
+		t.Errorf("Expected str '', got %s", str)
+	}
+
+	time.Sleep(40 * time.Millisecond)
+	if str != "timeout value" {
+		t.Errorf("Expected str 'timeout value', got %s", str)
+	}
+}
+
+// 测试 SetInterval 函数
+func TestSetInterval(t *testing.T) {
+	var str string
+	var count int
+	var ch chan struct{}
+
+	ch = promise.SetInterval(func() {
+		str += "interval "
+		count++
+		if count >= 3 {
+			promise.ClearInterval(ch)
+		}
+	}, 200)
+
+	time.Sleep(20 * time.Millisecond)
+	time.Sleep(160 * time.Millisecond)
+	if str != "" {
+		t.Errorf("Expected str '', got %s", str)
+	}
+	time.Sleep(40 * time.Millisecond)
+	if str != "interval " {
+		t.Errorf("Expected str 'interval ', got %s", str)
+	}
+
+	time.Sleep(160 * time.Millisecond)
+	if str != "interval " {
+		t.Errorf("Expected str 'interval ', got %s", str)
+	}
+	time.Sleep(40 * time.Millisecond)
+	if str != "interval interval " {
+		t.Errorf("Expected str 'interval interval ', got %s", str)
+	}
+
+	time.Sleep(160 * time.Millisecond)
+	if str != "interval interval " {
+		t.Errorf("Expected str 'interval interval ', got %s", str)
+	}
+	time.Sleep(40 * time.Millisecond)
+	if str != "interval interval interval " {
+		t.Errorf("Expected str 'interval interval interval ', got %s", str)
+	}
+}
+
+// 测试 SetInterval 函数 - 取消 - 第1次执行
+func TestSetIntervalCancelFirst(t *testing.T) {
+	var str string
+	var count int
+	var ch chan struct{}
+
+	ch = promise.SetInterval(func() {
+		str += "interval "
+		count++
+		if count >= 3 {
+			promise.ClearInterval(ch)
+		}
+	}, 200)
+
+	time.Sleep(20 * time.Millisecond)
+	promise.ClearInterval(ch)
+	time.Sleep(200 * time.Millisecond)
+	if str != "" {
+		t.Errorf("Expected str '', got %s", str)
+	}
+}
+
+// 测试 SetInterval 函数 - 取消 - 非首次执行
+func TestSetIntervalCancelNonFirst(t *testing.T) {
+	var str string
+	var count int
+	var ch chan struct{}
+
+	ch = promise.SetInterval(func() {
+		str += "interval "
+		count++
+		if count >= 3 {
+			promise.ClearInterval(ch)
+		}
+	}, 200)
+
+	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
+	if str != "interval " {
+		t.Errorf("Expected str 'interval ', got %s", str)
+	}
+	promise.ClearInterval(ch)
+	time.Sleep(400 * time.Millisecond)
+	if str != "interval " {
+		t.Errorf("Expected str 'interval ', got %s", str)
+	}
+}
+
+// 测试 SetInterval 函数 - 长延迟
+func TestSetIntervalLongDelay(t *testing.T) {
+	var str string
+	var count int
+	var ch chan struct{}
+
+	ch = promise.SetInterval(func() {
+		str += "interval "
+		count++
+		if count >= 3 {
+			promise.ClearInterval(ch)
+		}
+	}, 1000)
+
+	time.Sleep(20 * time.Millisecond)
+	time.Sleep(960 * time.Millisecond)
+	if str != "" {
+		t.Errorf("Expected str '', got %s", str)
+	}
+	time.Sleep(40 * time.Millisecond)
+	if str != "interval " {
+		t.Errorf("Expected str 'interval ', got %s", str)
+	}
+
+	time.Sleep(960 * time.Millisecond)
+	if str != "interval " {
+		t.Errorf("Expected str 'interval ', got %s", str)
+	}
+	time.Sleep(40 * time.Millisecond)
+	if str != "interval interval " {
+		t.Errorf("Expected str 'interval interval ', got %s", str)
+	}
+
+	time.Sleep(960 * time.Millisecond)
+	if str != "interval interval " {
+		t.Errorf("Expected str 'interval interval ', got %s", str)
+	}
+	time.Sleep(40 * time.Millisecond)
+	if str != "interval interval interval " {
+		t.Errorf("Expected str 'interval interval interval ', got %s", str)
+	}
+}
+
+// 测试异步调用顺序
+// FIXME: 测试结果与预期不符
+func TestAsyncCallOrder(t *testing.T) {
+	// 创建结果字符串，用于记录执行顺序
+	var result string
+	// 用于追加结果的辅助函数
+	appendResult := func(index string) {
+		if result == "" {
+			result = "[" + index + "]"
+		} else {
+			result += "-[" + index + "]"
+		}
+	}
+
+	// 同步代码
+	appendResult("01")
+
+	// setTimeout - 宏任务 1
+	promise.SetTimeout(func() {
+		appendResult("28")
+
+		// Promise.reject().catch - 微任务 1-1
+		promise.Reject("error").Catch(func(v any) (any, error) {
+			appendResult("29")
+			return nil, nil
+		})
+
+		// queueMicrotask - 微任务 1-2
+		promise.QueueMicrotask(func() {
+			appendResult("30")
+			// setTimeout - 宏任务 1-2-1
+			promise.SetTimeout(func() {
+				appendResult("37")
+			}, 0)
+		})
+
+		// setTimeout - 宏任务 1-3
+		promise.SetTimeout(func() {
+			appendResult("41")
+		}, 30)
+	}, 50)
+
+	// Promise.resolve() - p1
+	p1 := promise.Resolve(nil)
+	p1.Then(func(v any) (any, error) {
+		appendResult("04")
+
+		// Promise.resolve().then - 微任务 2-1
+		promise.Resolve(nil).Then(func(v any) (any, error) {
+			appendResult("10")
+			return nil, nil
+		}, nil)
+
+		// queueMicrotask - 微任务 2-2
+		promise.QueueMicrotask(func() {
+			appendResult("11")
+			// setTimeout - 宏任务 2-2-1
+			promise.SetTimeout(func() {
+				appendResult("38")
+			}, 50)
+		})
+
+		// setTimeout - 宏任务 2-3
+		promise.SetTimeout(func() {
+			appendResult("26")
+		}, 0)
+
+		return nil, nil
+	}, nil)
+
+	// Promise.resolve() - p2
+	p2 := promise.Resolve(nil)
+	p2.Then(func(v any) (any, error) {
+		appendResult("05")
+		return nil, nil
+	}, nil).Then(func(v any) (any, error) {
+		appendResult("12")
+
+		// Promise.resolve().then().then() - 微任务 3-2-1 和 3-2-2
+		promise.Resolve(nil).Then(func(v any) (any, error) {
+			appendResult("19")
+			return nil, nil
+		}, nil).Then(func(v any) (any, error) {
+			appendResult("24")
+			return nil, nil
+		}, nil)
+
+		// queueMicrotask - 微任务 3-2-3
+		promise.QueueMicrotask(func() {
+			appendResult("20")
+		})
+
+		// setTimeout - 宏任务 3-2-4
+		promise.SetTimeout(func() {
+			appendResult("39")
+
+			// queueMicrotask - 微任务 3-2-4-1
+			promise.QueueMicrotask(func() {
+				appendResult("40")
+			})
+		}, 50)
+
+		return nil, nil
+	}, nil).Then(func(v any) (any, error) {
+		appendResult("21")
+		return nil, nil
+	}, nil)
+
+	// new Promise - p3
+	p3 := promise.New(func(resolve, reject func(any)) error {
+		appendResult("02")
+		resolve(4)
+		return nil
+	})
+
+	// p3.then - 微任务 4-1
+	p3.Then(func(v any) (any, error) {
+		appendResult("06")
+
+		// Promise.reject().catch - 微任务 4-1-1
+		promise.Reject("error").Catch(func(v any) (any, error) {
+			appendResult("13")
+
+			// Promise.resolve().then - 微任务 4-1-1-1
+			promise.Resolve(nil).Then(func(v any) (any, error) {
+				appendResult("22")
+				return nil, nil
+			}, nil)
+
+			return nil, nil
+		})
+
+		// queueMicrotask - 微任务 4-1-2
+		promise.QueueMicrotask(func() {
+			appendResult("14")
+		})
+
+		// setTimeout - 宏任务 4-1-3
+		promise.SetTimeout(func() {
+			appendResult("35")
+		}, 50)
+
+		return nil, nil
+	}, nil)
+
+	// p3.then - 微任务 4-2
+	p3.Then(func(v any) (any, error) {
+		appendResult("07")
+
+		// Promise.resolve().finally - 微任务 4-2-1
+		promise.Resolve(nil).Finally(func() (any, error) {
+			appendResult("15")
+			return nil, nil
+		})
+
+		// queueMicrotask - 微任务 4-2-2
+		promise.QueueMicrotask(func() {
+			appendResult("16")
+		})
+
+		// setTimeout - 宏任务 4-2-3
+		promise.SetTimeout(func() {
+			appendResult("36")
+		}, 50)
+
+		return nil, nil
+	}, nil)
+
+	// p3.then - 微任务 4-3
+	p3.Then(func(v any) (any, error) {
+		appendResult("08")
+		return nil, nil
+	}, nil)
+
+	// setInterval - 宏任务 5
+	count := 1
+	var intervalCh chan struct{}
+	intervalCh = promise.SetInterval(func() {
+		appendResult("31")
+
+		if count >= 2 {
+			promise.ClearInterval(intervalCh)
+		}
+		count++
+
+		// Promise.resolve().finally - 微任务 5-1
+		promise.Resolve(nil).Finally(func() (any, error) {
+			appendResult("32")
+
+			// Promise.resolve().finally - 微任务 5-1-1
+			promise.Resolve(nil).Finally(func() (any, error) {
+				appendResult("34")
+				return nil, nil
+			})
+
+			return nil, nil
+		})
+
+		// queueMicrotask - 微任务 5-2
+		promise.QueueMicrotask(func() {
+			appendResult("33")
+		})
+
+		// setTimeout - 宏任务 5-3
+		promise.SetTimeout(func() {
+			appendResult("42")
+		}, 30)
+	}, 50)
+
+	// queueMicrotask - 微任务 6
+	promise.QueueMicrotask(func() {
+		appendResult("09")
+
+		// Promise.resolve().then().then().then() - 微任务 6-1, 6-2, 6-3
+		p := promise.Resolve(nil)
+		p.Then(func(v any) (any, error) {
+			appendResult("17")
+			return nil, nil
+		}, nil).Then(func(v any) (any, error) {
+			appendResult("23")
+			return nil, nil
+		}, nil).Then(func(v any) (any, error) {
+			appendResult("25")
+			return nil, nil
+		}, nil)
+
+		// queueMicrotask - 微任务 6-4
+		promise.QueueMicrotask(func() {
+			appendResult("18")
+		})
+
+		// setTimeout - 宏任务 6-5
+		promise.SetTimeout(func() {
+			appendResult("27")
+		}, 0)
+	})
+
+	// 同步代码结束
+	appendResult("03")
+
+	// 等待所有异步任务完成
+	time.Sleep(360 * time.Millisecond)
+
+	// 验证结果是否符合预期
+	expected := "[01]-[02]-[03]-[04]-[05]-[06]-[07]-[08]-[09]-[10]-[11]-[12]-[13]-[14]-[15]-[16]-[17]-[18]-[19]-[20]-[21]-[22]-[23]-[24]-[25]-[26]-[27]-[28]-[29]-[30]-[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-[37]-[41]-[42]-[31]-[32]-[33]-[34]-[42]"
+	if result != expected {
+		t.Errorf("Expected result:\n%s\n\nGot:\n%s", expected, result)
+	}
+}
+
+func TestMain(m *testing.M) {
+	m.Run()
 }

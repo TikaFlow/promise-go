@@ -18,9 +18,8 @@ type promiseImpl struct {
 	ip.Promise
 	state           string
 	value           any
-	settledHandlers []handler
+	settledHandlers chan *handler
 	done            chan struct{}
-	manager         *PromiseManager
 }
 
 // State 返回 Promise 的当前状态。
@@ -40,17 +39,20 @@ func (prom *promiseImpl) Done() chan struct{} {
 
 // Then 方法返回一个新的 Promise，其状态和结果值由 onFulfilled 或 onRejected 回调函数的执行结果决定。
 func (prom *promiseImpl) Then(onFulfilled ip.ThenCallback, onRejected ip.ThenCallback) ip.Promise {
-	prom2 := prom.manager.New(func(resolve, reject func(v any)) error {
+	prom2 := New(func(resolve, reject func(v any)) error {
 		return nil
 	})
-	prom.settledHandlers = append(prom.settledHandlers, handler{
+	prom.settledHandlers <- &handler{
 		onFulfilled: onFulfilled,
 		onRejected:  onRejected,
 		prom:        prom2.(*promiseImpl),
-	})
-	prom.manager.addTask(func() {
-		prom.manager.flushHandlers(prom)
-	})
+	}
+
+	if prom.state != ip.Pending {
+		QueueMicrotask(func() {
+			flushHandlers(prom)
+		})
+	}
 	// 2.2.7 then 方法返回的新 Promise 实例的状态由回调函数的执行结果决定
 	return prom2
 }
