@@ -1,3 +1,3 @@
 # Promise-Go
 
-Go language version of Promise implementation that conforms to Promise A+ specification and simulates event loops.
+Promise 的 Golang 实现，其行为符合 Promise A+ 规范并模拟了事件循环。

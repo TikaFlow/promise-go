@@ -126,30 +126,40 @@ func comsumeTask() {
 	}
 }
 
-// SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数。
-// callback 回调函数
-// millis 延迟执行的毫秒数
-// 返回一个定时器ID，可通过调用 ClearTimeout 函数来清除定时器。
+/*
+SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数。
+  - callback 回调函数
+  - millis 延迟执行的毫秒数
+
+返回一个定时器 ID，可通过调用 ClearTimeout 函数来清除定时器。
+*/
 func SetTimeout(callback func(), millis int64) int {
 	return produceTask(callback, millis, false)
 }
 
-// SetInterval 模拟 setInterval 函数，在指定毫秒数后重复调用回调函数。
-// callback 回调函数
-// millis 延迟执行的毫秒数
-// 返回一个定时器ID，可通过调用 ClearInterval 函数来清除定时器。
+/*
+SetInterval 模拟 setInterval 函数，在指定毫秒数后重复调用回调函数。
+  - callback 回调函数
+  - millis 延迟执行的毫秒数
+
+返回一个定时器 ID，可通过调用 ClearInterval 函数来清除定时器。
+*/
 func SetInterval(callback func(), millis int64) int {
 	return produceTask(callback, millis, true)
 }
 
-// ClearTimeout 清除由 SetTimeout 函数创建的定时器。
-// id 定时器ID
+/*
+ClearTimeout 清除由 SetTimeout 函数创建的定时器。
+  - id 定时器ID
+*/
 func ClearTimeout(id int) {
 	clearCh <- id
 }
 
-// ClearInterval 清除由 SetInterval 函数创建的定时器。
-// id 定时器ID
+/*
+ClearInterval 清除由 SetInterval 函数创建的定时器。
+  - id 定时器ID
+*/
 func ClearInterval(id int) {
 	clearCh <- id
 }
