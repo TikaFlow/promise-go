@@ -1,9 +1,19 @@
 package promise
 
 import (
+	"io"
+	"regexp"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+const (
+	margin time.Duration = time.Millisecond * 128
+	magic  time.Duration = 86413 * time.Second
 )
 
 var (
@@ -11,20 +21,40 @@ var (
 	microtaskQuene chan func()   = make(chan func(), 1024*10)
 	originTimeout  time.Duration = time.Millisecond * 512
 	timeout        time.Duration = originTimeout
-	margin         time.Duration = time.Millisecond * 128
 	loopTimer      *time.Timer   = time.NewTimer(timeout + margin)
 	done           chan struct{} = make(chan struct{})
-	magic          time.Duration = 86413 * time.Second
-	granted        sync.Once
+	eventLoopID    uint64        = 0
+	timeoutLock    sync.Mutex
+	timerLock      sync.Mutex
 )
 
 func init() {
-	go scheduleTask()
+	go timerScheduler()
 	go startEventLoop()
 }
 
-func closeFn() {
-	close(done)
+type eventLoopHandler struct {
+	doneCh chan struct{}
+}
+
+func (elh *eventLoopHandler) Close() error {
+	close(elh.doneCh)
+	return nil
+}
+
+/*
+EventLoopHandler 获取事件循环句柄，用于关闭事件循环。
+
+注意：一旦获取了事件循环句柄，就必须使用其 Close 方法关闭事件循环，否则会导致事件循环无法退出。
+*/
+func EventLoopHandler() io.Closer {
+	timeoutLock.Lock()
+	timeout = magic
+	originTimeout = magic
+	timeoutLock.Unlock()
+	return &eventLoopHandler{
+		doneCh: done,
+	}
 }
 
 /*
@@ -45,12 +75,12 @@ func New(exec Executor) Promise {
 
 	res := func(data any) {
 		prom.resolved.Do(func() {
-			resolve(prom, data)
+			resolvePromise(prom, data)
 		})
 	}
 	rej := func(reason any) {
 		prom.resolved.Do(func() {
-			reject(prom, reason)
+			rejectPromsie(prom, reason)
 		})
 	}
 
@@ -65,7 +95,7 @@ All 等待所有 Promise 解决。
   - 如果所有 Promise 都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有 Promise 解决值的数组；
   - 如果任何一个 Promise 被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的 Promise 的拒绝理由。
 */
-func All(proms []Promise) Promise {
+func All(proms ...any) Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -76,31 +106,20 @@ func All(proms []Promise) Promise {
 	return New(func(resolve, reject func(v any)) error {
 		results := make([]any, len(proms))
 		var count int32 = 0
-		rejected := false
 
-		QueueMicrotask(func() {
-			for i, prom := range proms {
-				go func(index int, p Promise) {
-					state, value := Wait(p)
-
-					if rejected {
-						return
-					}
-
-					if state == Rejected {
-						rejected = true
-						reject(value)
-						return
-					}
-
-					results[index] = value
-
-					if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) && !rejected {
-						resolve(results)
-					}
-				}(i, prom)
-			}
-		})
+		for index, item := range proms {
+			prom := Resolve(item)
+			prom.Then(func(v any) (any, error) {
+				results[index] = v
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+					resolve(results)
+				}
+				return nil, nil
+			}, func(reason any) (any, error) {
+				reject(reason)
+				return nil, nil
+			})
+		}
 
 		return nil
 	})
@@ -110,7 +129,7 @@ func All(proms []Promise) Promise {
 AllSettled 等待所有 Promise 完成（无论成功失败）。
   - 新 Promise 会在所有 Promise 完成后解决，解决值为一个包含所有 Promise 完成状态和结果的数组。
 */
-func AllSettled(proms []Promise) Promise {
+func AllSettled(proms ...any) Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -127,33 +146,35 @@ func AllSettled(proms []Promise) Promise {
 
 		results := make([]result, len(proms))
 		var count int32 = 0
-		QueueMicrotask(func() {
-			for i, prom := range proms {
-				go func(index int, p Promise) {
-					state, value := Wait(p)
-
-					if state == Fulfilled {
-						results[index] = result{Status: Fulfilled, Value: value}
+		for index, item := range proms {
+			prom := Resolve(item)
+			settleData := func() {
+				finalResults := make([]map[string]any, len(results))
+				for i, r := range results {
+					finalResults[i] = make(map[string]any)
+					finalResults[i]["status"] = r.Status
+					if r.Status == Fulfilled {
+						finalResults[i]["value"] = r.Value
 					} else {
-						results[index] = result{Status: Rejected, Reason: value}
+						finalResults[i]["reason"] = r.Reason
 					}
-
-					if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
-						finalResults := make([]map[string]any, len(results))
-						for i, r := range results {
-							finalResults[i] = make(map[string]any)
-							finalResults[i]["status"] = r.Status
-							if r.Status == Fulfilled {
-								finalResults[i]["value"] = r.Value
-							} else {
-								finalResults[i]["reason"] = r.Reason
-							}
-						}
-						resolve(finalResults)
-					}
-				}(i, prom)
+				}
+				resolve(finalResults)
 			}
-		})
+			prom.Then(func(v any) (any, error) {
+				results[index] = result{Status: Fulfilled, Value: v}
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+					settleData()
+				}
+				return nil, nil
+			}, func(reason any) (any, error) {
+				results[index] = result{Status: Rejected, Reason: reason}
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+					settleData()
+				}
+				return nil, nil
+			})
+		}
 
 		return nil
 	})
@@ -164,7 +185,7 @@ Any 等待第一个 Promise 解决。
   - 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的 Promise 的解决值。
   - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的 map。
 */
-func Any(proms []Promise) Promise {
+func Any(proms ...any) Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -179,35 +200,24 @@ func Any(proms []Promise) Promise {
 	return New(func(resolve, reject func(v any)) error {
 		reasons := make([]any, len(proms))
 		var count int32 = 0
-		resolved := false
 
-		QueueMicrotask(func() {
-			for i, prom := range proms {
-				go func(index int, p Promise) {
-					state, value := Wait(p)
-
-					if resolved {
-						return
-					}
-
-					if state == Fulfilled {
-						resolved = true
-						resolve(value)
-						return
-					}
-
-					reasons[index] = value
-
-					if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) && !resolved {
-						result := make(map[string]any)
-						result["errors"] = reasons
-						result["stack"] = "AggregateError: All promises were rejected"
-						result["message"] = "All promises were rejected"
-						reject(result)
-					}
-				}(i, prom)
-			}
-		})
+		for index, item := range proms {
+			prom := Resolve(item)
+			prom.Then(func(v any) (any, error) {
+				resolve(v)
+				return nil, nil
+			}, func(reason any) (any, error) {
+				reasons[index] = reason
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+					result := make(map[string]any)
+					result["errors"] = reasons
+					result["stack"] = "AggregateError: All promises were rejected"
+					result["message"] = "All promises were rejected"
+					reject(result)
+				}
+				return nil, nil
+			})
+		}
 
 		return nil
 	})
@@ -217,7 +227,7 @@ func Any(proms []Promise) Promise {
 Race 等待第一个 Promise 完成。
   - 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由跟随第一个完成的 Promise。
 */
-func Race(proms []Promise) Promise {
+func Race(proms ...any) Promise {
 	if proms == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
@@ -227,26 +237,16 @@ func Race(proms []Promise) Promise {
 			return nil
 		}
 
-		settled := false
-
-		QueueMicrotask(func() {
-			for _, prom := range proms {
-				go func(p Promise) {
-					state, value := Wait(p)
-
-					if settled {
-						return
-					}
-
-					settled = true
-					if state == Fulfilled {
-						resolve(value)
-					} else {
-						reject(value)
-					}
-				}(prom)
-			}
-		})
+		for _, item := range proms {
+			prom := Resolve(item)
+			prom.Then(func(v any) (any, error) {
+				resolve(v)
+				return nil, nil
+			}, func(reason any) (any, error) {
+				reject(reason)
+				return nil, nil
+			})
+		}
 
 		return nil
 	})
@@ -255,7 +255,7 @@ func Race(proms []Promise) Promise {
 /*
 Resolve 返回一个已解决的 Promise，解决值为指定值 value。
 
-如果 value 已经是 Promise，则直接返回该 Promise。
+如果 value 已经是 Promise，则直接返回该 Promise，详见 [MDN]。
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/resolve
 */
@@ -271,7 +271,7 @@ func Resolve(value any) Promise {
 }
 
 /*
-Reject 返回一个已拒绝的 Promise，拒绝理由为指定值。
+Reject 返回一个已拒绝的 Promise，拒绝理由为指定值，详见 [MDN]。
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 */
@@ -283,7 +283,7 @@ func Reject(reason any) Promise {
 }
 
 /*
-Try 接受一个任意类型的回调函数（无论其是同步或异步，返回结果或抛出异常），并将其结果封装成一个 Promise。
+Try 接受一个任意类型的回调函数（无论其是同步或异步，返回结果或抛出异常），并将其结果封装成一个 Promise，详见 [MDN]。
   - fn 任意类型的回调函数，接受任意数量的参数，函数返回值格式与 [ThenCallback] 相同。
   - args 将要传递给 fn 函数的参数列表。
 
@@ -315,7 +315,7 @@ func Try(fn func(...any) (any, error), args ...any) Promise {
 PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve 和 reject 函数，
 对应于传入给 Promise() 构造函数执行器的两个参数。
 
-这使得可以在 Promise 外部手动解决或拒绝 Promise。
+这使得可以在 Promise 外部手动解决或拒绝 Promise，详见 [MDN]。
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
 */
@@ -337,8 +337,39 @@ func QueueMicrotask(fn func()) {
 	resetLoopTimer()
 }
 
+/*
+将代码作为一个任务执行。
+
+这是一个语法糖，等价于以下语句：
+
+	SetTimeout(fn, 0)
+
+使用此函数包裹同步代码后，将完美模拟事件循环中 Promise 的行为，详见 [MDN]。
+
+[MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Execution_model#%E4%BD%9C%E4%B8%9A%E9%98%9F%E5%88%97%E4%B8%8E%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF
+*/
+func Run(fn func()) {
+	SetTimeout(fn, 0)
+}
+
+/*
+Done 返回一个通道，当事件循环结束时，该通道会被关闭。
+
+注意：如果希望手动停止事件循环，请不要关闭这个通道，而是使用 [EventLoopHandler] 获取句柄，调用其 Close 方法。
+*/
+func Done() chan struct{} {
+	return done
+}
+
 // ====== 辅助函数 ======
-func resolve(prom *promiseImpl, value any) {
+func resolvePromise(prom *promiseImpl, value any) {
+	if getGoroutineID() != eventLoopID {
+		SetTimeout(func() {
+			resolvePromise(prom, value)
+		}, 0)
+		return
+	}
+
 	if prom == nil {
 		return
 	}
@@ -349,7 +380,7 @@ func resolve(prom *promiseImpl, value any) {
 
 	if value == prom {
 		// 2.3.1 如果 Promise 和已决值相同，则抛出 TypeError 异常
-		reject(prom, "TypeError: Chaining cycle detected for promise")
+		rejectPromsie(prom, "TypeError: Chaining cycle detected for promise")
 		return
 	}
 
@@ -358,10 +389,10 @@ func resolve(prom *promiseImpl, value any) {
 		// 2.3.2 如果已决值是 Promise 对象，则采用其状态
 		QueueMicrotask(func() {
 			x.Then(func(v any) (any, error) {
-				resolve(prom, v)
+				resolvePromise(prom, v)
 				return nil, nil
 			}, func(r any) (any, error) {
-				reject(prom, r)
+				rejectPromsie(prom, r)
 				return nil, nil
 			})
 		})
@@ -373,12 +404,17 @@ func resolve(prom *promiseImpl, value any) {
 	prom.state = Fulfilled
 	prom.result = value
 	close(prom.settled)
-	QueueMicrotask(func() {
-		flushHandlers(prom)
-	})
+	flushHandlers(prom)
 }
 
-func reject(prom *promiseImpl, reason any) {
+func rejectPromsie(prom *promiseImpl, reason any) {
+	if getGoroutineID() != eventLoopID {
+		SetTimeout(func() {
+			rejectPromsie(prom, reason)
+		}, 0)
+		return
+	}
+
 	if prom == nil {
 		return
 	}
@@ -390,9 +426,7 @@ func reject(prom *promiseImpl, reason any) {
 	prom.state = Rejected
 	prom.result = reason
 	close(prom.settled)
-	QueueMicrotask(func() {
-		flushHandlers(prom)
-	})
+	flushHandlers(prom)
 }
 
 func queueTask(fn func()) {
@@ -401,6 +435,9 @@ func queueTask(fn func()) {
 }
 
 func resetLoopTimer() {
+	timerLock.Lock()
+	defer timerLock.Unlock()
+
 	if !loopTimer.Stop() {
 		select {
 		case <-loopTimer.C:
@@ -415,90 +452,77 @@ func flushHandlers(cur *promiseImpl) {
 	for {
 		select {
 		case hdl := <-cur.settledHandlers:
+			job := func() {
+				var res any
+				var err error
+				if cur.state == Fulfilled {
+					if hdl.onFulfilled == nil {
+						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.3）
+						resolvePromise(hdl.prom, cur.result)
+						return
+					} else {
+						// 2.2.2
+						res, err = hdl.onFulfilled(cur.result)
+						if err != nil {
+							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
+							rejectPromsie(hdl.prom, res)
+							return
+						}
+					}
+				} else { // 必然是 Rejected
+					if hdl.onRejected == nil {
+						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.4）
+						rejectPromsie(hdl.prom, cur.result)
+						return
+					} else {
+						// 2.2.3
+						res, err = hdl.onRejected(cur.result)
+						if err != nil {
+							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
+							rejectPromsie(hdl.prom, res)
+							return
+						}
+					}
+				}
 
-			var res any
-			var err error
-			if cur.state == Fulfilled {
-				if hdl.onFulfilled == nil {
-					// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.3）
-					resolve(hdl.prom, cur.result)
-					continue
-				} else {
-					// 2.2.2
-					res, err = hdl.onFulfilled(cur.result)
-					if err != nil {
-						// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
-						reject(hdl.prom, res)
-						continue
-					}
-				}
-			} else {
-				if hdl.onRejected == nil {
-					// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.4）
-					reject(hdl.prom, cur.result)
-					continue
-				} else {
-					// 2.2.3
-					res, err = hdl.onRejected(cur.result)
-					if err != nil {
-						// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
-						reject(hdl.prom, res)
-						continue
-					}
-				}
+				// 2.2.7.1 如果回调函数返回一个值，则使用该值来 resolve 新 Promise
+				resolvePromise(hdl.prom, res)
 			}
-
-			// 2.2.7.1 如果回调函数返回一个值，则使用该值来 resolve 新 Promise
-			resolve(hdl.prom, res)
+			QueueMicrotask(job)
 		default:
 			return
 		}
 	}
 }
 
+func getGoroutineID() uint64 {
+	buf := make([]byte, 64)
+	n := runtime.Stack(buf, false)
+	stackStr := string(buf[:n])
+
+	firstLine := stackStr
+	if idx := strings.Index(stackStr, "\n"); idx != -1 {
+		firstLine = stackStr[:idx]
+	}
+
+	re := regexp.MustCompile(`goroutine (\d+) `)
+	match := re.FindStringSubmatch(firstLine)
+	if len(match) < 2 {
+		return 0
+	}
+
+	id, _ := strconv.ParseUint(match[1], 10, 64)
+	return id
+}
+
 // ====== 辅助函数【结束】 ======
-
-/*
-Wait 同步阻塞等待 Promise 完成并返回其状态和值。
-
-注意：
-  - 此函数会阻塞当前 goroutine，直到 Promise 完成。
-  - Promise 可能永远不会完成，谨慎使用。
-*/
-func Wait(prom Promise) (state string, value any) {
-	<-prom.Done()
-	return prom.State(), prom.Result()
-}
-
-/*
-GetCloseFn 返回一个关闭函数，调用后会关闭事件循环。
-
-获取此函数后，必须调用此函数来结束事件循环，否则将不会停止。
-*/
-func GetCloseFn() func() {
-	granted.Do(func() {
-		timeout = magic
-		originTimeout = magic
-		resetLoopTimer()
-
-		go func() {
-			for {
-				select {
-				case <-time.After(time.Hour * 24):
-					resetLoopTimer()
-				case <-done:
-					return
-				}
-			}
-		}()
-	})
-	return closeFn
-}
 
 /*
 startEventLoop 模拟事件循环：清空微队列 -> 执行一个宏任务（如有） -> 清空微队列 ...
 */
 func startEventLoop() {
+	eventLoopID = getGoroutineID()
+	defer close(schedulerDone)
 loop:
 	for {
 		select {
@@ -525,11 +549,13 @@ loop:
 				case <-done:
 					break loop
 				case <-loopTimer.C:
-					break loop
+					if timeout == magic {
+						resetLoopTimer()
+						continue loop
+					}
+					close(done)
 				}
 			}
 		}
 	}
-
-	close(schedulerDone)
 }

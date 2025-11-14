@@ -1,18 +1,25 @@
 /*
-Package promise 提供了 Promise 的 Golang 实现，其行为符合 Promise A+ 规范并模拟了事件循环。
+Package promise 提供了 Promise 的 Golang 实现，其行为符合 Promise A+ 规范，
+并参考 Promise ES 规范实现，尽可能模拟了事件循环中 Promise 的行为。
 
 它还实现了 Stringer 接口，可直接打印 Promise 实例的状态和结果值。
 */
 package promise
 
 const (
-	// Pending 表示 Promise 初始状态，等待被解决或拒绝
+	/*
+		Pending 表示 Promise 初始状态，等待被解决或拒绝
+	*/
 	Pending = "pending"
 
-	// Fulfilled 表示 Promise 已成功解决
+	/*
+		Fulfilled 表示 Promise 已成功解决
+	*/
 	Fulfilled = "fulfilled"
 
-	// Rejected 表示 Promise 已被拒绝
+	/*
+		Rejected 表示 Promise 已被拒绝
+	*/
 	Rejected = "rejected"
 )
 
@@ -72,9 +79,10 @@ type Promise interface {
 	Then(onFulfilled, onRejected ThenCallback) Promise
 
 	/*
-		Catch 方法返回一个新的 Promise，其状态和结果值由 onRejected 回调函数的执行结果决定。
+		Catch 方法返回一个新的 Promise，其状态和结果值由 onRejected 回调函数的执行结果决定，详见 [MDN]。
 
 		这是一个语法糖，等价于以下语句：
+
 			promise.Then(nil, onRejected)
 
 		[MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch

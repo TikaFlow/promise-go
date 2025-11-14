@@ -23,7 +23,6 @@ type handler struct {
 promiseImpl 表示 Promise 的具体实现类。
 */
 type promiseImpl struct {
-	Promise
 	state           string
 	result          any
 	settledHandlers chan *handler
@@ -66,9 +65,7 @@ func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected ThenCallback)
 	}
 
 	if prom.state != Pending {
-		QueueMicrotask(func() {
-			flushHandlers(prom)
-		})
+		flushHandlers(prom)
 	}
 	// 2.2.7 then 方法返回的新 Promise 实例的状态由回调函数的执行结果决定
 	return prom2

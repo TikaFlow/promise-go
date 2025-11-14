@@ -1,16 +1,24 @@
 package promise
 
 import (
+	"sync"
 	"time"
+)
+
+const (
+	minDelay int64 = 1
 )
 
 var (
 	nextID         int             = 1
-	tasks          []*timerTask    = make([]*timerTask, 0, 256)
+	tasks          []*timerTask    = make([]*timerTask, 0, 1024*10)
 	schedulerTimer *time.Timer     = time.NewTimer(magic)
-	taskCh         chan *timerTask = make(chan *timerTask, 128)
-	clearCh        chan int        = make(chan int, 128)
+	curTimeout     time.Duration   = magic
+	taskCh         chan *timerTask = make(chan *timerTask, 1024)
+	clearCh        chan int        = make(chan int, 1024)
 	schedulerDone  chan struct{}   = make(chan struct{})
+	clearedTasks   map[int]bool    = make(map[int]bool)
+	idLock         sync.Mutex
 )
 
 type timerTask struct {
@@ -28,12 +36,20 @@ func resetSchedulerTimer(t time.Duration) {
 		default:
 		}
 	}
+	curTimeout = t
 	schedulerTimer.Reset(t)
 }
 
 func appendTask(task *timerTask) {
+	if clearedTasks[task.id] {
+		delete(clearedTasks, task.id)
+		return
+	}
+
 	if task.millis > timeout.Milliseconds() {
+		timeoutLock.Lock()
 		timeout = time.Duration(task.millis) * time.Millisecond
+		timeoutLock.Unlock()
 		resetLoopTimer()
 	}
 
@@ -69,6 +85,10 @@ func removeTask(id int) {
 
 	for i, task := range tasks {
 		if task.id == id {
+			if task.repeat {
+				clearedTasks[id] = true
+			}
+
 			tasks = append(tasks[:i], tasks[i+1:]...)
 
 			if len(tasks) > 0 {
@@ -86,9 +106,12 @@ func produceTask(callback func(), millis int64, repeat bool) int {
 		return -1
 	}
 
-	if millis < 0 {
-		millis = 0
+	if millis < minDelay {
+		millis = minDelay
 	}
+
+	idLock.Lock()
+	defer idLock.Unlock()
 
 	id := nextID
 	nextID++
@@ -109,7 +132,9 @@ func comsumeTask() {
 		tasks = tasks[1:]
 
 		if len(tasks) == 0 {
+			timeoutLock.Lock()
 			timeout = originTimeout
+			timeoutLock.Unlock()
 		}
 		queueTask(task.callback)
 
@@ -129,7 +154,7 @@ func comsumeTask() {
 /*
 SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数。
   - callback 回调函数
-  - millis 延迟执行的毫秒数
+  - millis 延迟执行的毫秒数，具有最低延迟限制：1ms
 
 返回一个定时器 ID，可通过调用 ClearTimeout 函数来清除定时器。
 */
@@ -140,7 +165,7 @@ func SetTimeout(callback func(), millis int64) int {
 /*
 SetInterval 模拟 setInterval 函数，在指定毫秒数后重复调用回调函数。
   - callback 回调函数
-  - millis 延迟执行的毫秒数
+  - millis 延迟执行的毫秒数，具有最低延迟限制：1ms
 
 返回一个定时器 ID，可通过调用 ClearInterval 函数来清除定时器。
 */
@@ -164,7 +189,7 @@ func ClearInterval(id int) {
 	clearCh <- id
 }
 
-func scheduleTask() {
+func timerScheduler() {
 	for {
 		select {
 		case task := <-taskCh:
@@ -172,6 +197,10 @@ func scheduleTask() {
 		case id := <-clearCh:
 			removeTask(id)
 		case <-schedulerTimer.C:
+			if curTimeout == magic {
+				resetSchedulerTimer(magic)
+				continue
+			}
 			comsumeTask()
 		case <-schedulerDone:
 			return
