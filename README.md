@@ -1,20 +1,18 @@
 # Promise-Go
 
-<center>
-    <map name="go-pkg"><area shape="default" href="https://pkg.go.dev/github.com/TikaFlow/promise-go" /></map>
-    <img src="https://pkg.go.dev/badge/github.com/TikaFlow/promise-go.svg" alt="Go Reference" usemap="#go-pkg">
-    <img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/TikaFlow/promise-go">
-    <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/TikaFlow/promise-go">
-    <img alt="GitHub Issues or Pull Requests" src="https://img.shields.io/github/issues/TikaFlow/promise-go">
-    <img alt="GitHub code size in bytes" src="https://img.shields.io/github/languages/code-size/TikaFlow/promise-go">
-    <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/TikaFlow/promise-go">
-    <img alt="GitHub go.mod Go version" src="https://img.shields.io/github/go-mod/go-version/TikaFlow/promise-go">
-    <img alt="GitHub License" src="https://img.shields.io/github/license/TikaFlow/promise-go">
-    <img alt="GitHub Tag" src="https://img.shields.io/github/v/tag/TikaFlow/promise-go">
-    <img alt="Maintenance" src="https://img.shields.io/maintenance/active/2025">
-    <img alt="GitHub Sponsors" src="https://img.shields.io/github/sponsors/TikaFlow">
-    <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/TikaFlow/promise-go">
-</center>
+<div align="center">
+    <a href="https://pkg.go.dev/github.com/TikaFlow/promise-go"><img src="https://pkg.go.dev/badge/github.com/TikaFlow/promise-go.svg"></a>
+    <a href="https://goreportcard.com/report/github.com/TikaFlow/promise-go"><img src="https://goreportcard.com/badge/github.com/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go/search?l=go"><img src="https://img.shields.io/github/languages/top/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go/issues"><img src="https://img.shields.io/github/issues/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/github/languages/code-size/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go/commits/master"><img src="https://img.shields.io/github/last-commit/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go/blob/master/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go?tab=MIT-1-ov-file"><img src="https://img.shields.io/github/license/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go/tags"><img src="https://img.shields.io/github/v/tag/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/github/stars/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/maintenance/active/2025"></a>
+</div>
 
 `Promise`的`Golang`实现，其行为符合`Promise A+`规范，并参考`Promise ES`规范实现，尽可能模拟了事件循环中`Promise`的行为。
 
