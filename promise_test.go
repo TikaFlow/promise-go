@@ -756,6 +756,91 @@ func TestPromiseAnyNilArray(t *testing.T) {
 	<-Done()
 }
 
+// 测试Some方法 - num<=0
+func TestPromiseSomeNumLE0(t *testing.T) {
+	t.Parallel()
+	Some(0, Resolve("success")).Then(func(v any) (any, error) {
+		t.Errorf("Promise.Some with num<=0 should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		if v != "RangeError: num must be greater than 0" {
+			t.Errorf("Expected error value 'RangeError: num must be greater than 0', got %v", v)
+		}
+		return nil, nil
+	})
+
+	<-Done()
+}
+
+// 测试Some方法 - num>proms长度
+func TestPromiseSomeNumGTPromsLen(t *testing.T) {
+	t.Parallel()
+	Some(2, Resolve("success")).Then(func(v any) (any, error) {
+		t.Errorf("Promise.Some with num>proms length should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		if v != "RangeError: not enough promises to resolve" {
+			t.Errorf("Expected error value 'RangeError: not enough promises to resolve', got %v", v)
+		}
+		return nil, nil
+	})
+
+	<-Done()
+}
+
+// 测试Some方法 - 3个满足2个
+func TestPromiseSome2in3(t *testing.T) {
+	t.Parallel()
+	p1 := Resolve("success1")
+	p2 := Resolve("success2")
+	p3 := Reject("failure")
+
+	Some(2, p1, p2, p3).Then(func(v any) (any, error) {
+		if len(v.([]any)) != 2 {
+			t.Errorf("Expected 2 values, got %d", len(v.([]any)))
+			return nil, nil
+		}
+		if v.([]any)[0] != "success1" || v.([]any)[1] != "success2" {
+			t.Errorf("Expected values ['success1','success2'], got %v", v.([]any))
+		}
+		return nil, nil
+	}, func(v any) (any, error) {
+		t.Errorf("Promise.Some should be fulfilled, but was rejected with %v", v)
+		return nil, nil
+	})
+
+	<-Done()
+}
+
+// 测试Some方法 - 3个拒绝2个
+func TestPromiseSome2out3(t *testing.T) {
+	t.Parallel()
+	p1 := Reject("failure1")
+	p2 := Reject("failure2")
+	p3 := Resolve("success")
+
+	Some(2, p1, p2, p3).Then(func(v any) (any, error) {
+		t.Errorf("Promise.Some should be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v any) (any, error) {
+		agg, ok := v.(map[string]any)
+		if !ok {
+			t.Errorf("Expected map[string]any, got %T", v)
+			return nil, nil
+		}
+		if len(agg["errors"].([]any)) != 2 {
+			t.Errorf("Expected 2 errors, got %d", len(agg["errors"].([]any)))
+			return nil, nil
+		}
+		if agg["errors"].([]any)[0] != "failure1" || agg["errors"].([]any)[1] != "failure2" {
+			t.Errorf("Expected errors ['failure1','failure2'], got %v", agg["errors"].([]any))
+		}
+		return nil, nil
+	})
+
+	<-Done()
+}
+
 // 测试Race方法 - 第一个完成的是成功的Promise
 func TestPromiseRaceFulfilled(t *testing.T) {
 	t.Parallel()

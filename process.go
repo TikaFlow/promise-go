@@ -95,6 +95,64 @@ func New(exec Executor) Promise {
 }
 
 /*
+Some 等待前 num 个 Promise 解决。
+  - 如果 num 个 Promise 解决，新 Promise 也会被解决，且解决值为一个包含所有 Promise 解决值的数组，
+    其顺序为被解决的顺序。
+  - 如果太多 Promise 被拒绝，以至于新 Promise 永远无法满足，那么新 Promise 会立即被拒绝，
+    且拒绝理由为一个包含所有 Promise 拒绝理由的 map，其顺序为被拒绝的顺序。
+
+注意与 [Any] 的不同，不仅是解决值的格式不同，拒绝理由的顺序也不同。
+*/
+func Some(num int, proms ...any) Promise {
+	if proms == nil {
+		return Reject("TypeError: nil is not iterable")
+	}
+	if num <= 0 {
+		return Reject("RangeError: num must be greater than 0")
+	}
+	if len(proms) == 0 {
+		result := make(map[string]any)
+		result["errors"] = make([]any, 0)
+		result["stack"] = "AggregateError: All promises were rejected"
+		result["message"] = "All promises were rejected"
+		return Reject(result)
+	}
+	if num > len(proms) {
+		return Reject("RangeError: not enough promises to resolve")
+	}
+
+	return New(func(resolve, reject func(v any)) error {
+		threshold := len(proms) - num + 1
+		values := make([]any, 0, num)
+		reasons := make([]any, 0, threshold)
+		var resCount int32 = 0
+		var rejCount int32 = 0
+
+		for _, item := range proms {
+			prom := Resolve(item)
+			prom.Then(func(v any) (any, error) {
+				values = append(values, v)
+				if newCount := atomic.AddInt32(&resCount, 1); int(newCount) == num {
+					resolve(values)
+				}
+				return nil, nil
+			}, func(reason any) (any, error) {
+				reasons = append(reasons, reason)
+				if newCount := atomic.AddInt32(&rejCount, 1); int(newCount) == threshold {
+					result := make(map[string]any)
+					result["errors"] = reasons
+					result["stack"] = "AggregateError: Too many promises were rejected"
+					result["message"] = "Too many promises were rejected"
+					reject(result)
+				}
+				return nil, nil
+			})
+		}
+		return nil
+	})
+}
+
+/*
 All 等待所有 Promise 解决。
   - 如果所有 Promise 都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有 Promise 解决值的数组；
   - 如果任何一个 Promise 被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的 Promise 的拒绝理由。
@@ -187,7 +245,8 @@ func AllSettled(proms ...any) Promise {
 /*
 Any 等待第一个 Promise 解决。
   - 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的 Promise 的解决值。
-  - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的 map。
+  - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的 map，
+    其顺序为 Promise 数组中的顺序。
 */
 func Any(proms ...any) Promise {
 	if proms == nil {
