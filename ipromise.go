@@ -41,7 +41,7 @@ FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数。
   - 返回值是一个已拒绝的 Promise 实例，将以同样的理由拒绝新 Promise。
   - 执行中报错，将以同样的理由拒绝新 Promise。
 
-报错和错误格式与 ThenCallback 相同。
+报错和错误格式与 [ThenCallback] 相同。
 */
 type FinallyCallback func() (v any, err error)
 

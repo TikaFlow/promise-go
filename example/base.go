@@ -41,15 +41,7 @@ func ChainExample() {
 	<-promise.Done()
 }
 
-// 宏任务
-func MacroTaskExample() {
-	// 将代码包装为一个宏任务
-	promise.Async(func() {
-		println("Macrotask 1")
-	})
-
-	<-promise.Done()
-}
+// 宏任务 - 见 [DelayExample]
 
 // 微队列
 func MicroQueueExample() {
@@ -75,6 +67,26 @@ func DelayExample() {
 		promise.ClearInterval(id2)
 		println("Interval 1")
 	}, 300)
+
+	<-promise.Done()
+}
+
+// Async与Await
+func AsyncAwaitExample() {
+	promise.Async(func() {
+		println("Macrotask 1")
+	})
+
+	p := promise.New(func(resolve, reject func(v any)) (err error) {
+		resolve("hello world")
+		return
+	})
+	v, err := promise.Await(p, 1000)
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	println(v.(string))
 
 	<-promise.Done()
 }

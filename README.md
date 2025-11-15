@@ -201,6 +201,9 @@ func QueueMicrotask(fn func())
 // Async 将代码包装为异步任务执行
 func Async(fn func())
 
+// Await 等待 Promise 完成，并设定超时时间
+func Await(prom Promise, timeout int64) (v any, err error)
+
 // EventLoopHandler 返回事件循环句柄，用于关闭事件循环
 func EventLoopHandler() io.Closer
 ```

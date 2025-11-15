@@ -1,6 +1,7 @@
 package promise
 
 import (
+	"errors"
 	"io"
 	"regexp"
 	"runtime"
@@ -350,6 +351,44 @@ Async 将代码作为一个异步任务执行。
 */
 func Async(fn func()) {
 	SetTimeout(fn, 0)
+}
+
+/*
+Await 等待 Promise 完成，并设定超时时间，以免无限等待。
+
+  - prom Promise 实例，等待其完成。
+  - timeout 超时时间，单位为毫秒。
+
+返回值：与 [ThenCallback] 相同，v 总是需要的值（包括错误信息），而 err 仅代表是否出错。
+
+v 的值可能是：
+
+  - 如果 Promise 在超时时间内未完成，则为超时错误。
+  - 如果 Promise 成功，v 为 Promise 解决值。
+  - 如果 Promise 拒绝，v 为 Promise 拒绝理由。
+*/
+func Await(prom Promise, timeout int64) (v any, err error) {
+	negErr := errors.New("await timeout must be greater than 0")
+	if timeout <= 0 {
+		return negErr, negErr
+	}
+
+	timer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
+	defer timer.Stop()
+
+	timeoutErr := errors.New("await timeout")
+	prom = Resolve(prom)
+	select {
+	case <-prom.Done():
+		v = prom.Result()
+		if prom.State() == Rejected {
+			err = errors.New("promise rejected")
+		}
+	case <-timer.C:
+		v, err = timeoutErr, timeoutErr
+	}
+
+	return
 }
 
 /*
