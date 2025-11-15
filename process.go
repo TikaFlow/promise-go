@@ -316,6 +316,35 @@ func Race(proms ...any) Promise {
 }
 
 /*
+Map 对 Promise 数组中的每个元素应用一个函数，返回一个新的 Promise 数组，新数组的每个元素都是原数组对应元素应用函数后的结果。
+  - mapper 对每个元素进行操作的函数，接受一个参数 item 并返回一个新值。
+  - proms 包含 Promise 元素的数组。
+
+返回一个 Promise，其状态可以是：
+  - 已解决（Fulfilled）：如果所有 Promise 都成功解决，且每个 Promise 的解决值都被 mapper 处理后得到新值。
+  - 已拒绝（Rejected）：如果任何一个 Promise 被拒绝。
+*/
+func Map(mapper func(item any) any, proms ...any) Promise {
+	if proms == nil {
+		return Reject("TypeError: nil is not iterable")
+	}
+	if len(proms) == 0 {
+		return Resolve(make([]any, 0))
+	}
+
+	if mapper == nil {
+		return Reject("TypeError: nil is not a function")
+	}
+
+	result := make([]any, len(proms))
+	for index, item := range proms {
+		result[index] = mapper(item)
+	}
+
+	return All(result...)
+}
+
+/*
 Resolve 返回一个已解决的 Promise，解决值为指定值 value。
 
 如果 value 已经是 Promise，则直接返回该 Promise，详见 [MDN]。
