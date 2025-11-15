@@ -53,7 +53,7 @@ func TestPromiseBasicReject(t *testing.T) {
 // 测试Promise的格式化输出
 func TestPromiseString(t *testing.T) {
 	t.Parallel()
-	Run(func() {
+	Async(func() {
 		p := New(func(resolve, reject func(any)) error {
 			resolve("success")
 			return nil
@@ -1063,7 +1063,7 @@ func TestPromiseThenable(t *testing.T) {
 	t.Parallel()
 	result := "init"
 
-	Run(func() {
+	Async(func() {
 		p1, resolveP1, _ := PromiseWithResolvers()
 		p2 := New(func(resolve, reject func(any)) error {
 			resolve(p1)
@@ -1212,7 +1212,7 @@ func TestSetTimeoutZeroMillis(t *testing.T) {
 		str = "timeout value"
 	}, 0)
 
-	Run(func() {
+	Async(func() {
 		if str != "timeout value" {
 			t.Errorf("Expected str 'timeout value', got %s", str)
 		}
@@ -1412,7 +1412,7 @@ func TestSetIntervalLongDelay(t *testing.T) {
 func TestAsyncCallOrderMicro(t *testing.T) {
 	t.Parallel()
 	result := ""
-	Run(func() {
+	Async(func() {
 		var res func(any)
 		p := Resolve("success")
 		p.Then(func(v any) (any, error) {
@@ -1436,7 +1436,7 @@ func TestAsyncCallOrderMicro(t *testing.T) {
 		})
 	})
 
-	Run(func() {
+	Async(func() {
 		if result != "[A][B][C][D][E]" {
 			t.Errorf("Expected result1 '[A][B][C][D][E]', got %s", result)
 		}
@@ -1502,7 +1502,7 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 	t.Parallel()
 	var result string
 
-	Run(func() {
+	Async(func() {
 		result += "[01]"
 
 		SetTimeout(func() {

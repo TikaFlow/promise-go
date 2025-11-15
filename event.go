@@ -338,7 +338,7 @@ func QueueMicrotask(fn func()) {
 }
 
 /*
-将代码作为一个任务执行。
+Async 将代码作为一个异步任务执行。
 
 这是一个语法糖，等价于以下语句：
 
@@ -348,7 +348,7 @@ func QueueMicrotask(fn func()) {
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Execution_model#%E4%BD%9C%E4%B8%9A%E9%98%9F%E5%88%97%E4%B8%8E%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF
 */
-func Run(fn func()) {
+func Async(fn func()) {
 	SetTimeout(fn, 0)
 }
 

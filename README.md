@@ -62,8 +62,8 @@ package main
 import "github.com/TikaFlow/promise-go"
 
 func main() {
-    // 推荐将 Promise 相关代码包装为宏任务，更符合事件循环机制
-    promise.Run(func() {
+    // 推荐将 Promise 相关代码包装为异步任务，更符合事件循环机制
+    promise.Async(func() {
         // 创建一个成功的 Promise
         p := promise.New(func(resolve, reject func(v any)) (err error) {
             // 模拟异步操作
@@ -198,8 +198,8 @@ func ClearInterval(id int)
 // QueueMicrotask 将回调函数添加到微任务队列
 func QueueMicrotask(fn func())
 
-// Run 将代码包装为宏任务执行
-func Run(fn func())
+// Async 将代码包装为异步任务执行
+func Async(fn func())
 
 // EventLoopHandler 返回事件循环句柄，用于关闭事件循环
 func EventLoopHandler() io.Closer

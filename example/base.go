@@ -44,7 +44,7 @@ func ChainExample() {
 // 宏任务
 func MacroTaskExample() {
 	// 将代码包装为一个宏任务
-	promise.Run(func() {
+	promise.Async(func() {
 		println("Macrotask 1")
 	})
 
