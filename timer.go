@@ -11,6 +11,7 @@ const (
 
 var (
 	nextID         int             = 1
+	taskQuene      chan func()     = make(chan func(), 1024*10)
 	tasks          []*timerTask    = make([]*timerTask, 0, 1024*10)
 	schedulerTimer *time.Timer     = time.NewTimer(magic)
 	curTimeout     time.Duration   = magic
@@ -26,6 +27,11 @@ type timerTask struct {
 	millis   int64
 	callback func()
 	repeat   bool
+}
+
+func queueTask(fn func()) {
+	taskQuene <- fn
+	resetLoopTimer()
 }
 
 func resetSchedulerTimer(t time.Duration) {
