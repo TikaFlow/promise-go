@@ -17,7 +17,6 @@ var (
 	taskCh         chan *timerTask = make(chan *timerTask, 1024)
 	clearCh        chan int        = make(chan int, 1024)
 	schedulerDone  chan struct{}   = make(chan struct{})
-	clearedTasks   map[int]bool    = make(map[int]bool)
 	idLock         sync.Mutex
 )
 
@@ -41,11 +40,6 @@ func resetSchedulerTimer(t time.Duration) {
 }
 
 func appendTask(task *timerTask) {
-	if clearedTasks[task.id] {
-		delete(clearedTasks, task.id)
-		return
-	}
-
 	if task.millis > timeout.Milliseconds() {
 		timeoutLock.Lock()
 		timeout = time.Duration(task.millis) * time.Millisecond
@@ -85,10 +79,6 @@ func removeTask(id int) {
 
 	for i, task := range tasks {
 		if task.id == id {
-			if task.repeat {
-				clearedTasks[id] = true
-			}
-
 			tasks = append(tasks[:i], tasks[i+1:]...)
 
 			if len(tasks) > 0 {
@@ -140,7 +130,7 @@ func comsumeTask() {
 
 		if task.repeat {
 			task.deadline = time.Now().Add(time.Duration(task.millis) * time.Millisecond)
-			taskCh <- task
+			appendTask(task)
 		}
 
 		if len(tasks) > 0 {
