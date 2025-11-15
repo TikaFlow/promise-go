@@ -49,6 +49,8 @@ func resolvePromise(prom *promiseImpl, value any) {
 	prom.state = Fulfilled
 	prom.result = value
 	close(prom.settled)
+	callHooks(PromiseSettled, prom)
+	callHooks(PromiseFulfilled, prom)
 	flushHandlers(prom)
 }
 
@@ -71,6 +73,8 @@ func rejectPromsie(prom *promiseImpl, reason any) {
 	prom.state = Rejected
 	prom.result = reason
 	close(prom.settled)
+	callHooks(PromiseSettled, prom)
+	callHooks(PromiseRejected, prom)
 	flushHandlers(prom)
 }
 

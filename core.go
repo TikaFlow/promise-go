@@ -69,6 +69,7 @@ func New(exec Executor) Promise {
 		settledHandlers: make(chan *handler, 128),
 		settled:         make(chan struct{}),
 	}
+	callHooks(PromiseCreated, prom)
 
 	res := func(data any) {
 		prom.resolved.Do(func() {

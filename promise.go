@@ -58,6 +58,7 @@ func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected ThenCallback)
 	prom2 := New(func(resolve, reject func(v any)) error {
 		return nil
 	})
+	callHooks(PromiseChained, prom)
 	prom.settledHandlers <- &handler{
 		onFulfilled: onFulfilled,
 		onRejected:  onRejected,
