@@ -38,6 +38,9 @@ type eventLoopHandler struct {
 	doneCh chan struct{}
 }
 
+/*
+[io.Closer.Close]
+*/
 func (elh *eventLoopHandler) Close() error {
 	close(elh.doneCh)
 	return nil
@@ -356,7 +359,7 @@ func Async(fn func()) {
 /*
 Await 等待 Promise 完成，并设定超时时间，以免无限等待。
 
-  - prom Promise 实例，等待其完成。
+  - prom 需要等待的 Promise 实例，如果不是 Promise 实例，则会被包装成 Promise。
   - timeout 超时时间，单位为毫秒。
 
 返回值：与 [ThenCallback] 相同，v 总是需要的值（包括错误信息），而 err 仅代表是否出错。
@@ -367,7 +370,7 @@ v 的值可能是：
   - 如果 Promise 成功，v 为 Promise 解决值。
   - 如果 Promise 拒绝，v 为 Promise 拒绝理由。
 */
-func Await(prom Promise, timeout int64) (v any, err error) {
+func Await(prom any, timeout int64) (v any, err error) {
 	negErr := errors.New("await timeout must be greater than 0")
 	if timeout <= 0 {
 		return negErr, negErr
@@ -376,12 +379,12 @@ func Await(prom Promise, timeout int64) (v any, err error) {
 	timer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
 	defer timer.Stop()
 
-	timeoutErr := errors.New("await timeout")
-	prom = Resolve(prom)
+	timeoutErr := errors.New("TimeoutError: await timeout")
+	prom2 := Resolve(prom)
 	select {
-	case <-prom.Done():
-		v = prom.Result()
-		if prom.State() == Rejected {
+	case <-prom2.Done():
+		v = prom2.Result()
+		if prom2.State() == Rejected {
 			err = errors.New("promise rejected")
 		}
 	case <-timer.C:
@@ -392,11 +395,32 @@ func Await(prom Promise, timeout int64) (v any, err error) {
 }
 
 /*
-Done 返回一个通道，当事件循环结束时，该通道会被关闭。
+Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
 
-注意：如果希望手动停止事件循环，请不要关闭这个通道，而是使用 [EventLoopHandler] 获取句柄，调用其 Close 方法。
+  - prom 将会使用的已决值，如果 prom 是 Promise 实例，则会等待其完成后才开始计时；
+    如果是一个已拒绝的 Promise，则会立即拒绝新 Promise。
+  - timeout 延迟时间，单位为毫秒。
 */
-func Done() chan struct{} {
+func Delay(prom any, millis int64) Promise {
+	return New(func(resolve, reject func(v any)) error {
+		Resolve(prom).Then(func(v any) (any, error) {
+			go func() {
+				time.Sleep(time.Duration(millis) * time.Millisecond)
+				resolve(v)
+			}()
+			return nil, nil
+		}, func(r any) (any, error) {
+			reject(r)
+			return nil, nil
+		})
+		return nil
+	})
+}
+
+/*
+Done 返回一个通道，当事件循环结束时，该通道会被关闭。
+*/
+func Done() <-chan struct{} {
 	return done
 }
 
