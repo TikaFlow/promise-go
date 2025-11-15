@@ -1408,6 +1408,125 @@ func TestSetIntervalLongDelay(t *testing.T) {
 	<-Done()
 }
 
+// 测试Await - 成功
+func TestAwaitSuccess(t *testing.T) {
+	t.Parallel()
+	p := New(func(resolve, reject func(any)) error {
+		resolve("success")
+		return nil
+	})
+
+	res, err := Await(p, 50)
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
+	if res != "success" {
+		t.Errorf("Expected 'success', got %s", res)
+	}
+}
+
+// 测试Await - timeout不是正数
+func TestAwaitTimeoutNotPositive(t *testing.T) {
+	t.Parallel()
+	p := New(func(resolve, reject func(any)) error {
+		resolve("success")
+		return nil
+	})
+
+	expected := "await timeout must be greater than 0"
+	res, err := Await(p, -100)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+	if res.(error).Error() != expected {
+		t.Errorf("Expected error '%s', got %s", expected, res.(error).Error())
+	}
+
+	res, err = Await(p, -0)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+	if res.(error).Error() != expected {
+		t.Errorf("Expected error '%s', got %s", expected, res.(error).Error())
+	}
+}
+
+// 测试Await - 超时
+func TestAwaitTimeout(t *testing.T) {
+	t.Parallel()
+	p := New(func(resolve, reject func(any)) error {
+		SetTimeout(func() {
+			resolve("success")
+		}, 100)
+		return nil
+	})
+
+	res, err := Await(p, 50)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+	if res.(error).Error() != "TimeoutError: await timeout" {
+		t.Errorf("Expected error 'TimeoutError: await timeout', got %s", res.(error).Error())
+	}
+}
+
+// 测试Await - 拒绝的Promise
+func TestAwaitRejectedPromise(t *testing.T) {
+	t.Parallel()
+	p := New(func(resolve, reject func(any)) error {
+		reject("error")
+		return nil
+	})
+
+	res, err := Await(p, 50)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+	if res != "error" {
+		t.Errorf("Expected error 'error', got %s", res)
+	}
+}
+
+// 测试Delay函数
+func TestDelay(t *testing.T) {
+	t.Parallel()
+	val := "value"
+
+	if _, err := Await(Delay(val, 50), 40); err == nil {
+		// timeout
+		t.Errorf("Expected 'TimeoutError: await timeout', got nil")
+	}
+
+	res, err := Await(Delay(val, 50), 60)
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
+	if res != val {
+		t.Errorf("Expected '%s', got %s", val, res)
+	}
+
+	p := New(func(resolve, reject func(any)) error {
+		SetTimeout(func() {
+			resolve("success")
+		}, 50)
+		return nil
+	})
+	if _, err = Await(Delay(p, 50), 90); err == nil {
+		// timeout
+		t.Errorf("Expected 'TimeoutError: await timeout', got nil")
+	}
+
+	p2 := New(func(resolve, reject func(any)) error {
+		SetTimeout(func() {
+			resolve("success")
+		}, 50)
+		return nil
+	})
+	if res, _ := Await(Delay(p2, 50), 110); res != "success" {
+		t.Errorf("Expected 'success', got %s", res)
+	}
+}
+
 // 测试异步调用顺序 - 微任务
 func TestAsyncCallOrderMicro(t *testing.T) {
 	t.Parallel()

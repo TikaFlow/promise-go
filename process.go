@@ -403,10 +403,10 @@ Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
 */
 func Delay(prom any, millis int64) Promise {
 	return New(func(resolve, reject func(v any)) error {
-		Resolve(prom).Then(func(v any) (any, error) {
+		Resolve(prom).Then(func(v2 any) (any, error) {
 			go func() {
 				time.Sleep(time.Duration(millis) * time.Millisecond)
-				resolve(v)
+				resolve(v2)
 			}()
 			return nil, nil
 		}, func(r any) (any, error) {
