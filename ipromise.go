@@ -1,6 +1,6 @@
 /*
-Package promise 提供了 Promise 的 Golang 实现，其行为符合 Promise A+ 规范，
-并参考 Promise ES 规范实现，尽可能模拟了事件循环中 Promise 的行为。
+Package promise 提供了 Promise 的 Golang 实现，其行为符合 Promises/A+ 规范，
+并参考 Promise ES 规范实现，尽可能模拟了 JavaScript 事件循环中 Promise 的行为。
 
 它还实现了 Stringer 接口，可直接打印 Promise 实例的状态和结果值。
 */
@@ -55,7 +55,7 @@ Executor 是 Promise 构造函数的执行器。
 type Executor func(resolve, reject func(v any)) (err error)
 
 /*
-Promise 是一个拥有 then 方法的对象，其行为符合 Promise/A+ 规范。
+Promise 是一个拥有 then 方法的对象，其行为符合 Promises/A+ 规范。
 */
 type Promise interface {
 	/*

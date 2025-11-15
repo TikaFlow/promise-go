@@ -14,13 +14,13 @@
     <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/maintenance/active/2025"></a>
 </div>
 
-`Promise`的`Golang`实现，其行为符合`Promise A+`规范，并参考`Promise ES`规范实现，尽可能模拟了事件循环中`Promise`的行为。
+`Promise`的`Golang`实现，其行为符合`Promises/A+`规范，并参考`Promise ES`规范实现，尽可能模拟了`JavaScript`事件循环中`Promise`的行为。
 
 ## 项目概述
 
 `Promise-Go`提供了一个完整的异步编程解决方案，允许开发者以链式调用的方式处理异步操作，具有以下特点：
 
-- 完全符合`Promise A+`规范
+- 完全符合`Promises/A+`规范
 - 支持`Promise ES`规范中的常用方法
 - 模拟`JavaScript`事件循环机制（宏任务和微任务队列）
 - 提供丰富的`Promise`组合方法（`All`、`AllSettled`、`Any`、`Race`等）
@@ -121,7 +121,7 @@ type Executor func(resolve, reject func(v any)) (err error)
 ### Promise 接口
 
 ```go
-// Promise 是一个拥有 then 方法的对象，其行为符合 Promise/A+ 规范
+// Promise 是一个拥有 then 方法的对象，其行为符合 Promises/A+ 规范
 type Promise interface {
     // State 返回 Promise 的当前状态
     State() string
