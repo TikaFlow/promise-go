@@ -89,35 +89,11 @@ func main() {
 }
 ```
 
-## 核心接口与类型
+## 核心接口
 
-### 常量
+### 完整API
 
-表示`Promise`状态的常量：
-
-```go
-// Pending 表示 Promise 初始状态，等待被解决或拒绝
-const Pending = "pending"
-
-// Fulfilled 表示 Promise 已成功解决
-const Fulfilled = "fulfilled"
-
-// Rejected 表示 Promise 已被拒绝
-const Rejected = "rejected"
-```
-
-### 回调函数类型
-
-```go
-// ThenCallback 是 Promise 已决时的回调函数（成功或失败）
-type ThenCallback func(any) (v any, err error)
-
-// FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数
-type FinallyCallback func() (v any, err error)
-
-// Executor 是 Promise 构造函数的执行器
-type Executor func(resolve, reject func(v any)) (err error)
-```
+请参考[API文档](https://pkg.go.dev/github.com/TikaFlow/promise-go)获取完整的函数列表和详细说明。
 
 ### Promise 接口
 
@@ -157,12 +133,6 @@ func Resolve(value any) Promise
 
 // Reject 返回一个已拒绝的 Promise
 func Reject(reason any)
-
-// Try 将函数执行结果封装成一个 Promise
-func Try(fn func(...any) (any, error), args ...any) Promise
-
-// PromiseWithResolvers 创建一个新的 Promise 并返回 resolve 和 reject 函数
-func PromiseWithResolvers() (Promise, func(any), func(any))
 ```
 
 #### Promise 组合函数
@@ -179,34 +149,6 @@ func Any(proms ...any) Promise
 
 // Race 等待第一个 Promise 完成
 func Race(proms ...any) Promise
-```
-
-#### 事件循环相关函数
-
-```go
-// SetTimeout 模拟 setTimeout 函数
-func SetTimeout(callback func(), millis int64) int
-
-// SetInterval 模拟 setInterval 函数
-func SetInterval(callback func(), millis int64) int
-
-// ClearTimeout 清除由 SetTimeout 创建的定时器
-func ClearTimeout(id int)
-
-// ClearInterval 清除由 SetInterval 创建的定时器
-func ClearInterval(id int)
-
-// QueueMicrotask 将回调函数添加到微任务队列
-func QueueMicrotask(fn func())
-
-// Async 将代码包装为异步任务执行
-func Async(fn func())
-
-// Await 等待 Promise 完成，并设定超时时间
-func Await(prom Promise, timeout int64) (v any, err error)
-
-// EventLoopHandler 返回事件循环句柄，用于关闭事件循环
-func EventLoopHandler() io.Closer
 ```
 
 ## 典型示例
@@ -306,19 +248,7 @@ func main() {
 #### 等待 Promise 完成
 
 `<-p.Done()`可以等待`Promise`完成，但需要注意，这会阻塞当前`goroutine`，直到`Promise`完成（有可能永远是`Pending`）。因此应避免使用，
-而是使用`p.Then()`或`p.Catch()`来处理`Promise`的结果。
-
-```go
-// 等待 Promise 完成，不推荐
-<-p.Done()
-println("Promise 完成")
-
-// 推荐使用 Then 处理 Promise 结果
-p.Then(func(v any) (any, error) {
-    println("Promise 完成:", v)
-    return v, nil
-}, nil)
-```
+而是使用`p.Then()`或`p.Catch()`来处理`Promise`的结果，或调用`promise.Await()`等待`Promise`完成。
 
 ### 错误处理
 
