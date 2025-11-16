@@ -71,7 +71,7 @@ type Promise interface {
 	/*
 		Done 返回一个通道，当 Promise 状态变为 Fulfilled 或 Rejected 时，该通道会被关闭。
 	*/
-	Done() chan struct{}
+	Done() <-chan struct{}
 
 	/*
 		Then 方法返回一个新的 Promise，其状态和结果值由 onFulfilled 或 onRejected 回调函数的执行结果决定。

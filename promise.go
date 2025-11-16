@@ -47,7 +47,7 @@ func (prom *promiseImpl) Result() any {
 /*
 [Promise.Done]
 */
-func (prom *promiseImpl) Done() chan struct{} {
+func (prom *promiseImpl) Done() <-chan struct{} {
 	return prom.settled
 }
 
