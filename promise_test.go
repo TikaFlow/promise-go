@@ -16,6 +16,57 @@ func TestMain(m *testing.M) {
 	<-Done()
 }
 
+// 测试Filter方法 - 全部成功
+func TestFilterAllResolved(t *testing.T) {
+	t.Parallel()
+	p1 := 1
+	p2 := Resolve(2)
+	p3 := 3
+
+	filter := func(item any) bool {
+		return item.(int) > 1
+	}
+	Filter(filter, p1, p2, p3).
+		Then(func(v any) (any, error) {
+			if len(v.([]any)) != 2 {
+				t.Errorf("Expected array length 2, got %d", len(v.([]any)))
+			}
+			if v.([]any)[0] != 2 {
+				t.Errorf("Expected value 2, got %v", v.([]any)[0])
+			}
+			if v.([]any)[1] != 3 {
+				t.Errorf("Expected value 3, got %v", v.([]any)[1])
+			}
+			return nil, nil
+		}, nil)
+
+	<-Done()
+}
+
+// 测试Filter方法 - 有一个拒绝
+func TestFilterOneRejected(t *testing.T) {
+	t.Parallel()
+	p1 := Resolve(1)
+	p2 := Reject("error")
+	p3 := 3
+
+	filter := func(item any) bool {
+		return item.(int) > 1
+	}
+	Filter(filter, p1, p2, p3).
+		Then(func(v any) (any, error) {
+			t.Errorf("Promise should not be fulfilled, got value: %v", v)
+			return nil, nil
+		}, func(v any) (any, error) {
+			if v != "error" {
+				t.Errorf("Expected error 'error', got '%s'", v)
+			}
+			return nil, nil
+		})
+
+	<-Done()
+}
+
 // 测试Map方法 - 全部成功
 func TestMapAllResolved(t *testing.T) {
 	t.Parallel()
@@ -76,13 +127,12 @@ func TestEachAllSuccess(t *testing.T) {
 	t.Parallel()
 	p1 := Resolve(1)
 	p2 := Resolve(2)
-	inputs := []any{p1, p2, 3}
 	Each(func(item any, index int, arrLen int) any {
 		return item.(int) * 2
-	}, inputs...).
+	}, p1, p2, 3).
 		Then(func(v any) (any, error) {
-			if len(v.([]any)) != len(inputs) {
-				t.Errorf("Expected array length %d, got %d", len(inputs), len(v.([]any)))
+			if len(v.([]any)) != 3 {
+				t.Errorf("Expected array length 3, got %d", len(v.([]any)))
 			}
 			if v.([]any)[0] != 1 {
 				t.Errorf("Expected value 1, got %v", v.([]any)[0])
@@ -103,10 +153,10 @@ func TestEachAllSuccess(t *testing.T) {
 func TestEachOneFailure(t *testing.T) {
 	t.Parallel()
 	p2 := Reject("error")
-	inputs := []any{1, p2, 3}
+
 	Each(func(item any, index int, arrLen int) any {
 		return item.(int) * 2
-	}, inputs...).
+	}, 1, p2, 3).
 		Then(func(v any) (any, error) {
 			t.Errorf("Promise should not be fulfilled, got value: %v", v)
 			return nil, nil

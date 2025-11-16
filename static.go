@@ -270,8 +270,7 @@ func Delay(prom any, millis int64) Promise {
 
 /*
 Filter 过滤数组中的元素，返回一个新的 Promise，其状态可以是：
-  - 已解决（Fulfilled）：如果所有 Promise 都成功解决，且每个 Promise 的解决值都被 filter 处理后得到新值，
-    已决值是过滤后的数组。
+  - 已解决（Fulfilled）：如果所有 Promise 都成功解决，已决值是过滤后的数组。
   - 已拒绝（Rejected）：如果任何一个 Promise 被拒绝。
 
 本质上是 Map + Array.Filter 的快捷方式。
