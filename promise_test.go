@@ -8,6 +8,62 @@ import (
 	"time"
 )
 
+// 测试主函数
+func TestMain(m *testing.M) {
+	m.Run()
+
+	<-Done()
+}
+
+// 测试Each方法 - 所有Promise都成功
+func TestEachAllSuccess(t *testing.T) {
+	t.Parallel()
+	p1 := Resolve(1)
+	p2 := Resolve(2)
+	inputs := []any{p1, p2, 3}
+	Each(func(item any, index int, arrLen int) any {
+		return item.(int) * 2
+	}, inputs...).
+		Then(func(v any) (any, error) {
+			if len(v.([]any)) != len(inputs) {
+				t.Errorf("Expected array length %d, got %d", len(inputs), len(v.([]any)))
+			}
+			if v.([]any)[0] != 1 {
+				t.Errorf("Expected value 1, got %v", v.([]any)[0])
+			}
+			if v.([]any)[1] != 2 {
+				t.Errorf("Expected value 2, got %v", v.([]any)[1])
+			}
+			if v.([]any)[2] != 3 {
+				t.Errorf("Expected value 3, got %v", v.([]any)[2])
+			}
+			return nil, nil
+		}, nil)
+
+	<-Done()
+}
+
+// 测试Each - 中间有一个失败
+func TestEachOneFailure(t *testing.T) {
+	t.Parallel()
+	p2 := Reject("error")
+	inputs := []any{1, p2, 3}
+	Each(func(item any, index int, arrLen int) any {
+		return item.(int) * 2
+	}, inputs...).
+		Then(func(v any) (any, error) {
+			t.Errorf("Promise should not be fulfilled, got value: %v", v)
+			return nil, nil
+		}, func(v any) (any, error) {
+			if v != "error" {
+				t.Errorf("Expected error 'error', got '%s'", v)
+			}
+			return nil, nil
+		})
+
+	<-Done()
+}
+
 // 测试Promise的基本创建和解决
 func TestPromiseBasicResolve(t *testing.T) {
 	t.Parallel()
@@ -1910,12 +1966,6 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 			t.Errorf("Expected result:\n%s\n\nGot:\n%s", expected, result)
 		}
 	}, 360)
-
-	<-Done()
-}
-
-func TestMain(m *testing.M) {
-	m.Run()
 
 	<-Done()
 }

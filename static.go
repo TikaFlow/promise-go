@@ -241,7 +241,7 @@ func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 			return result, nil
 		}, nil).
 		Catch(func(r any) (any, error) {
-			return r, nil
+			return r, errors.New("promise rejected")
 		})
 }
 
