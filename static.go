@@ -239,10 +239,7 @@ func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	return prom.
 		Then(func(any) (any, error) {
 			return result, nil
-		}, nil).
-		Catch(func(r any) (any, error) {
-			return r, errors.New("promise rejected")
-		})
+		}, nil)
 }
 
 /*
@@ -398,7 +395,7 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 				return inputs[0], nil
 			}
 
-			acc := initial
+			acc := v
 			result := Each(func(item any, index int, arrLen int) any {
 				acc = reducer(acc, item)
 				return nil

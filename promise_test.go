@@ -16,6 +16,81 @@ func TestMain(m *testing.M) {
 	<-Done()
 }
 
+// 测试Reduce方法 - 成功累加
+func TestReduceSuccess(t *testing.T) {
+	t.Parallel()
+	p1 := Resolve(1)
+	p2 := 2
+	p3 := Resolve(3)
+
+	reducer := func(acc any, item any) any {
+		return acc.(int) + item.(int)
+	}
+	Reduce(reducer, 0, p1, p2, p3).
+		Then(func(v any) (any, error) {
+			if v.(int) != 6 {
+				t.Errorf("Expected value 6, got %v", v.(int))
+			}
+			return nil, nil
+		}, nil)
+
+	<-Done()
+}
+
+// 测试Reduce方法 - 输入数组长度为0
+func TestReduceEmptyArray(t *testing.T) {
+	t.Parallel()
+	reducer := func(acc any, item any) any {
+		return acc.(int) + item.(int)
+	}
+	Reduce(reducer, Resolve(3), []any{}...).
+		Then(func(v any) (any, error) {
+			if v.(int) != 3 {
+				t.Errorf("Expected value 3, got %v", v.(int))
+			}
+			return nil, nil
+		}, nil)
+
+	<-Done()
+}
+
+// 测试Reduce方法 - 只有一个元素且初始值为nil
+func TestReduceSingleElement(t *testing.T) {
+	t.Parallel()
+	reducer := func(acc any, item any) any {
+		return acc.(int) + item.(int)
+	}
+	Reduce(reducer, nil, Resolve(4)).
+		Then(func(v any) (any, error) {
+			if v.(int) != 4 {
+				t.Errorf("Expected value 7, got %v", v.(int))
+			}
+			return nil, nil
+		}, nil)
+
+	<-Done()
+}
+
+// 测试Reduce方法 - 存在拒绝的Promise
+func TestReduceRejected(t *testing.T) {
+	t.Parallel()
+	reducer := func(acc any, item any) any {
+		return acc.(int) + item.(int)
+	}
+	Reduce(reducer, Resolve(3), Resolve(4), Reject("error")).
+		Then(func(v any) (any, error) {
+			t.Errorf("Promise should not be fulfilled, got value: %v", v)
+			return nil, nil
+		}, func(v any) (any, error) {
+			if v != "error" {
+				t.Errorf("Expected error 'error', got '%s'", v)
+			}
+			return nil, nil
+		})
+
+	<-Done()
+}
+
 // 测试Filter方法 - 全部成功
 func TestFilterAllResolved(t *testing.T) {
 	t.Parallel()
