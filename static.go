@@ -7,27 +7,27 @@ import (
 )
 
 /*
-All 等待所有 Promise 解决。
-  - 如果所有 Promise 都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有 Promise 解决值的数组；
-  - 如果任何一个 Promise 被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的 Promise 的拒绝理由。
+All 等待所有输入解决。
+  - 如果 inputs 的所有元素都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有元素解决值的数组；
+  - 如果任何一个元素被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的元素的拒绝理由。
 */
-func All(proms ...any) Promise {
-	if proms == nil {
+func All(inputs ...any) Promise {
+	if inputs == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
-	if len(proms) == 0 {
+	if len(inputs) == 0 {
 		return Resolve(make([]any, 0))
 	}
 
 	return New(func(resolve, reject func(v any)) error {
-		results := make([]any, len(proms))
+		results := make([]any, len(inputs))
 		var count int32 = 0
 
-		for index, item := range proms {
+		for index, item := range inputs {
 			prom := Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				results[index] = v
-				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(inputs) {
 					resolve(results)
 				}
 				return nil, nil
@@ -45,11 +45,11 @@ func All(proms ...any) Promise {
 AllSettled 等待所有 Promise 完成（无论成功失败）。
   - 新 Promise 会在所有 Promise 完成后解决，解决值为一个包含所有 Promise 完成状态和结果的数组。
 */
-func AllSettled(proms ...any) Promise {
-	if proms == nil {
+func AllSettled(inputs ...any) Promise {
+	if inputs == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
-	if len(proms) == 0 {
+	if len(inputs) == 0 {
 		return Resolve(make([]map[string]any, 0))
 	}
 
@@ -60,12 +60,13 @@ func AllSettled(proms ...any) Promise {
 			Reason any
 		}
 
-		results := make([]result, len(proms))
+		length := len(inputs)
+		results := make([]result, length)
 		var count int32 = 0
-		for index, item := range proms {
+		for index, item := range inputs {
 			prom := Resolve(item)
 			settleData := func() {
-				finalResults := make([]map[string]any, len(results))
+				finalResults := make([]map[string]any, length)
 				for i, r := range results {
 					finalResults[i] = make(map[string]any)
 					finalResults[i]["status"] = r.Status
@@ -79,13 +80,13 @@ func AllSettled(proms ...any) Promise {
 			}
 			prom.Then(func(v any) (any, error) {
 				results[index] = result{Status: Fulfilled, Value: v}
-				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					settleData()
 				}
 				return nil, nil
 			}, func(reason any) (any, error) {
 				results[index] = result{Status: Rejected, Reason: reason}
-				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					settleData()
 				}
 				return nil, nil
@@ -97,16 +98,16 @@ func AllSettled(proms ...any) Promise {
 }
 
 /*
-Any 等待第一个 Promise 解决。
-  - 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的 Promise 的解决值。
+Any 等待 inputs 中第一个成功解决的元素。
+  - 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的解决值。
   - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的 map，
     其顺序为 Promise 数组中的顺序。
 */
-func Any(proms ...any) Promise {
-	if proms == nil {
+func Any(inputs ...any) Promise {
+	if inputs == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
-	if len(proms) == 0 {
+	if len(inputs) == 0 {
 		result := make(map[string]any)
 		result["errors"] = make([]any, 0)
 		result["stack"] = "AggregateError: All promises were rejected"
@@ -115,17 +116,19 @@ func Any(proms ...any) Promise {
 	}
 
 	return New(func(resolve, reject func(v any)) error {
-		reasons := make([]any, len(proms))
+		length := len(inputs)
+		reasons := make([]any, length)
+
 		var count int32 = 0
 
-		for index, item := range proms {
+		for index, item := range inputs {
 			prom := Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				resolve(v)
 				return nil, nil
 			}, func(reason any) (any, error) {
 				reasons[index] = reason
-				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(proms) {
+				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					result := make(map[string]any)
 					result["errors"] = reasons
 					result["stack"] = "AggregateError: All promises were rejected"
@@ -142,12 +145,12 @@ func Any(proms ...any) Promise {
 
 /*
 Async 将代码作为一个异步任务执行。
+主要作用是被事件循环调度，并不会开启新的go程。如果 fn 是一个耗时任务，依然会阻塞事件循环。
+使用此函数包裹同步代码后，将完美模拟事件循环中 Promise 的行为，详见 [MDN]。
 
 这是一个语法糖，等价于以下语句：
 
 	SetTimeout(fn, 0)
-
-使用此函数包裹同步代码后，将完美模拟事件循环中 Promise 的行为，详见 [MDN]。
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Execution_model#%E4%BD%9C%E4%B8%9A%E9%98%9F%E5%88%97%E4%B8%8E%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF
 */
@@ -194,6 +197,53 @@ func Await(prom any, timeout int64) (v any, err error) {
 }
 
 /*
+Each 按顺序等待数组中的每个元素完成，每个元素的完成结果会被传递给回调函数。
+如果迭代器返回一个 Promise，则会等待该 Promise 完成后再继续迭代；
+如果当前迭代对象是 Promise，则会等待其完成后再继续迭代；
+迭代过程中遇到任何一个 Promise 被拒绝，新 Promise 也会以同样的理由被拒绝。
+
+  - it 对每个元素进行操作的函数，接受三个参数：item（当前元素）、index（当前元素的索引）、arrLen（数组长度）。
+  - inputs 需要迭代的输入。
+
+返回一个 Promise，其状态可以是：
+  - 已解决（Fulfilled）：如果所有迭代都成功解决，已决值是包含原始输入已决值的数组。
+  - 已拒绝（Rejected）：如果迭代过程中任何一个 Promise 被拒绝。
+*/
+func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
+	if inputs == nil {
+		return Reject("TypeError: nil is not iterable")
+	}
+	if len(inputs) == 0 {
+		return Resolve(make([]any, 0))
+	}
+	if it == nil {
+		return Reject("TypeError: nil is not a function")
+	}
+
+	prom := Resolve("start")
+	arrLen := len(inputs)
+	result := make([]any, arrLen)
+	for index, item := range inputs {
+		prom = prom.
+			Then(func(any) (any, error) {
+				return item, nil
+			}, nil).
+			Then(func(v any) (any, error) {
+				result[index] = v
+				return it(v, index, arrLen), nil
+			}, nil)
+	}
+
+	return prom.
+		Then(func(any) (any, error) {
+			return result, nil
+		}, nil).
+		Catch(func(r any) (any, error) {
+			return r, nil
+		})
+}
+
+/*
 Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
 
   - prom 将会使用的已决值，如果 prom 是 Promise 实例，则会等待其完成后才开始计时；
@@ -217,28 +267,27 @@ func Delay(prom any, millis int64) Promise {
 }
 
 /*
-Map 对 Promise 数组中的每个元素应用一个函数，返回一个新的 Promise 数组，新数组的每个元素都是原数组对应元素应用函数后的结果。
+Map 对输入数组中的每个元素应用一个函数，返回一个新的 Promise 数组，新数组的每个元素都是原数组对应元素应用函数后的结果。
   - mapper 对每个元素进行操作的函数，接受一个参数 item 并返回一个新值。
-  - proms 包含 Promise 元素的数组。
+  - inputs 被映射的输入。
 
 返回一个 Promise，其状态可以是：
   - 已解决（Fulfilled）：如果所有 Promise 都成功解决，且每个 Promise 的解决值都被 mapper 处理后得到新值。
   - 已拒绝（Rejected）：如果任何一个 Promise 被拒绝。
 */
-func Map(mapper func(item any) any, proms ...any) Promise {
-	if proms == nil {
+func Map(mapper func(item any) any, inputs ...any) Promise {
+	if inputs == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
-	if len(proms) == 0 {
+	if len(inputs) == 0 {
 		return Resolve(make([]any, 0))
 	}
-
 	if mapper == nil {
 		return Reject("TypeError: nil is not a function")
 	}
 
-	result := make([]any, len(proms))
-	for index, item := range proms {
+	result := make([]any, len(inputs))
+	for index, item := range inputs {
 		result[index] = Resolve(item).Then(func(v any) (any, error) {
 			return mapper(v), nil
 		}, nil)
@@ -269,17 +318,17 @@ func PromiseWithResolvers() (Promise, func(any), func(any)) {
 Race 等待第一个 Promise 完成。
   - 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由跟随第一个完成的 Promise。
 */
-func Race(proms ...any) Promise {
-	if proms == nil {
+func Race(inputs ...any) Promise {
+	if inputs == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
 
 	return New(func(resolve, reject func(v any)) error {
-		if len(proms) == 0 {
+		if len(inputs) == 0 {
 			return nil
 		}
 
-		for _, item := range proms {
+		for _, item := range inputs {
 			prom := Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				resolve(v)
@@ -325,40 +374,40 @@ func Resolve(value any) Promise {
 }
 
 /*
-Some 等待前 num 个 Promise 解决。
-  - 如果 num 个 Promise 解决，新 Promise 也会被解决，且解决值为一个包含所有 Promise 解决值的数组，
+Some 等待 inputs 中前 num 个元素解决。
+  - 如果 num 个元素解决，新 Promise 也会被解决，且解决值为一个包含所有元素解决值的数组，
     其顺序为被解决的顺序。
-  - 如果太多 Promise 被拒绝，以至于新 Promise 永远无法满足，那么新 Promise 会立即被拒绝，
-    且拒绝理由为一个包含所有 Promise 拒绝理由的 map，其顺序为被拒绝的顺序。
+  - 如果太多元素被拒绝，以至于新 Promise 永远无法满足，那么新 Promise 会立即被拒绝，
+    且拒绝理由为一个包含所有元素拒绝理由的 map，其顺序为被拒绝的顺序。
 
 注意与 [Any] 的不同，不仅是解决值的格式不同，拒绝理由的顺序也不同。
 */
-func Some(num int, proms ...any) Promise {
-	if proms == nil {
+func Some(num int, inputs ...any) Promise {
+	if inputs == nil {
 		return Reject("TypeError: nil is not iterable")
 	}
 	if num <= 0 {
 		return Reject("RangeError: num must be greater than 0")
 	}
-	if len(proms) == 0 {
+	if len(inputs) == 0 {
 		result := make(map[string]any)
 		result["errors"] = make([]any, 0)
 		result["stack"] = "AggregateError: All promises were rejected"
 		result["message"] = "All promises were rejected"
 		return Reject(result)
 	}
-	if num > len(proms) {
+	if num > len(inputs) {
 		return Reject("RangeError: not enough promises to resolve")
 	}
 
 	return New(func(resolve, reject func(v any)) error {
-		threshold := len(proms) - num + 1
+		threshold := len(inputs) - num + 1
 		values := make([]any, 0, num)
 		reasons := make([]any, 0, threshold)
 		var resCount int32 = 0
 		var rejCount int32 = 0
 
-		for _, item := range proms {
+		for _, item := range inputs {
 			prom := Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				values = append(values, v)
