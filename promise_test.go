@@ -3,14 +3,70 @@ package promise_test
 import (
 	"errors"
 	"fmt"
-	. "github.com/TikaFlow/promise-go"
 	"testing"
 	"time"
+
+	. "github.com/TikaFlow/promise-go"
 )
 
 // 测试主函数
 func TestMain(m *testing.M) {
 	m.Run()
+
+	<-Done()
+}
+
+// 测试Map方法 - 全部成功
+func TestMapAllResolved(t *testing.T) {
+	t.Parallel()
+	p1 := Resolve(1)
+	p2 := Resolve(2)
+	p3 := 3
+	mapper := func(item any) any {
+		return item.(int) * 2
+	}
+	Map(mapper, p1, p2, p3).
+		Then(func(v any) (any, error) {
+			if len(v.([]any)) != 3 {
+				t.Errorf("Expected array length 3, got %d", len(v.([]any)))
+			}
+			if v.([]any)[0] != 2 {
+				t.Errorf("Expected value 2, got %v", v.([]any)[0])
+			}
+			if v.([]any)[1] != 4 {
+				t.Errorf("Expected value 4, got %v", v.([]any)[1])
+			}
+			if v.([]any)[2] != 6 {
+				t.Errorf("Expected value 6, got %v", v.([]any)[2])
+			}
+			return nil, nil
+		}, func(v any) (any, error) {
+			t.Errorf("Promise should not be rejected, got reason: %v", v)
+			return nil, nil
+		})
+
+	<-Done()
+}
+
+// 测试Map方法 - 有一个拒绝
+func TestMapOneRejected(t *testing.T) {
+	t.Parallel()
+	p1 := Resolve(1)
+	p2 := Reject("error")
+	p3 := 3
+	mapper := func(item any) any {
+		return item.(int) * 2
+	}
+	Map(mapper, p1, p2, p3).
+		Then(func(v any) (any, error) {
+			t.Errorf("Promise should not be fulfilled, got value: %v", v)
+			return nil, nil
+		}, func(v any) (any, error) {
+			if v != "error" {
+				t.Errorf("Expected error 'error', got '%s'", v)
+			}
+			return nil, nil
+		})
 
 	<-Done()
 }
