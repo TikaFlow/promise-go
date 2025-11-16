@@ -202,6 +202,8 @@ Each 按顺序等待数组中的每个元素完成，每个元素的完成结果
 如果当前迭代对象是 Promise，则会等待其完成后再继续迭代；
 迭代过程中遇到任何一个 Promise 被拒绝，新 Promise 也会以同样的理由被拒绝。
 
+由于迭代器的输出会被丢弃，因此适合副作用操作，如打印日志等。
+
   - it 对每个元素进行操作的函数，接受三个参数：item（当前元素）、index（当前元素的索引）、arrLen（数组长度）。
   - inputs 需要迭代的输入。
 
@@ -264,6 +266,31 @@ func Delay(prom any, millis int64) Promise {
 		})
 		return nil
 	})
+}
+
+/*
+Filter 过滤数组中的元素，返回一个新的 Promise，其状态可以是：
+  - 已解决（Fulfilled）：如果所有 Promise 都成功解决，且每个 Promise 的解决值都被 filter 处理后得到新值，
+    已决值是过滤后的数组。
+  - 已拒绝（Rejected）：如果任何一个 Promise 被拒绝。
+
+本质上是 Map + Array.Filter 的快捷方式。
+*/
+func Filter(filter func(item any) bool, inputs ...any) Promise {
+	return Map(func(item any) any {
+		return All(item, filter(item))
+	}, inputs...).
+		Then(func(v any) (any, error) {
+			values := v.([]any)
+			result := make([]any, 0)
+			for _, item := range values {
+				tuple := item.([]any)
+				if tuple[1].(bool) {
+					result = append(result, tuple[0])
+				}
+			}
+			return result, nil
+		}, nil)
 }
 
 /*
