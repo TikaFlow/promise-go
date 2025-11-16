@@ -371,6 +371,48 @@ func Race(inputs ...any) Promise {
 }
 
 /*
+Reduce 对数组中的每个元素应用一个函数，将其结果累积到一个累加器中，最后返回累加器的值。
+
+  - reducer 对每个元素进行操作的函数，接受两个参数 acc（累加器）和 cur（当前元素），
+    返回新的累加器值。
+  - initial 初始累加器值。
+  - inputs 被操作的数组。
+
+返回一个 Promise，其状态可以是：
+  - 已解决（Fulfilled）：如果所有 Promise 都成功解决，且每个 Promise 的解决值都被 reducer 处理后得到新值。
+  - 已拒绝（Rejected）：如果任何一个 Promise 被拒绝。
+
+特殊情况：
+  - 如果 inputs 为空数组，直接返回初始 initial；
+  - 如果 initial 为 nil，且 inputs 只有一个元素，直接返回该元素。
+*/
+func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise {
+	init := Resolve(initial)
+
+	if len(inputs) == 0 {
+		return init
+	}
+
+	return init.
+		Then(func(v any) (any, error) {
+			if v == nil && len(inputs) == 1 {
+				return inputs[0], nil
+			}
+
+			acc := initial
+			result := Each(func(item any, index int, arrLen int) any {
+				acc = reducer(acc, item)
+				return nil
+			}, inputs...).
+				Then(func(v any) (any, error) {
+					return acc, nil
+				}, nil)
+			return result, nil
+		}, nil)
+
+}
+
+/*
 Reject 返回一个已拒绝的 Promise，拒绝理由为指定值，详见 [MDN]。
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
