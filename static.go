@@ -182,7 +182,10 @@ func Await(prom any, timeout int64) (v any, err error) {
 	defer timer.Stop()
 
 	timeoutErr := errors.New("TimeoutError: await timeout")
-	prom2 := Resolve(prom)
+	prom2, ok := prom.(Promise)
+	if !ok {
+		return prom, nil
+	}
 	select {
 	case <-prom2.Done():
 		v = prom2.Result()
@@ -252,10 +255,9 @@ Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
 func Delay(prom any, millis int64) Promise {
 	return New(func(resolve, reject func(v any)) error {
 		Resolve(prom).Then(func(v2 any) (any, error) {
-			go func() {
-				time.Sleep(time.Duration(millis) * time.Millisecond)
+			SetTimeout(func() {
 				resolve(v2)
-			}()
+			}, millis)
 			return nil, nil
 		}, func(r any) (any, error) {
 			reject(r)

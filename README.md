@@ -1,16 +1,17 @@
 # Promise-Go
 
 <div align="center">
+    <a href="https://github.com/TikaFlow/promise-go/actions/workflows/go-test.yml"><img src="https://github.com/TikaFlow/promise-go/workflows/Tests/badge.svg"></a>
     <a href="https://pkg.go.dev/github.com/TikaFlow/promise-go"><img src="https://pkg.go.dev/badge/github.com/TikaFlow/promise-go.svg"></a>
-    <a href="https://promisesaplus.com/"><img src="https://img.shields.io/badge/Promises-A%2B-gold?labelColor=aqua"></a>
     <a href="https://goreportcard.com/report/github.com/TikaFlow/promise-go"><img src="https://goreportcard.com/badge/github.com/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go/search?l=go"><img src="https://img.shields.io/github/languages/top/TikaFlow/promise-go"></a>
-    <a href="https://github.com/TikaFlow/promise-go/issues"><img src="https://img.shields.io/github/issues/TikaFlow/promise-go"></a>
+    <a href="https://promisesaplus.com/"><img src="https://img.shields.io/badge/Promise-A%2B-brightgreen?labelColor=gold"></a>
     <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/github/languages/code-size/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go/commits/master"><img src="https://img.shields.io/github/last-commit/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go/blob/master/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go?tab=MIT-1-ov-file"><img src="https://img.shields.io/github/license/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go/tags"><img src="https://img.shields.io/github/v/tag/TikaFlow/promise-go"></a>
+    <a href="https://github.com/TikaFlow/promise-go/issues"><img src="https://img.shields.io/github/issues/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/github/stars/TikaFlow/promise-go"></a>
     <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/maintenance/active/2025"></a>
 </div>

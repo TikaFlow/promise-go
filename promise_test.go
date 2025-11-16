@@ -1732,7 +1732,6 @@ func TestSetIntervalLongDelay(t *testing.T) {
 
 // 测试Await - 成功
 func TestAwaitSuccess(t *testing.T) {
-	t.Parallel()
 	p := New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
@@ -1749,7 +1748,6 @@ func TestAwaitSuccess(t *testing.T) {
 
 // 测试Await - timeout不是正数
 func TestAwaitTimeoutNotPositive(t *testing.T) {
-	t.Parallel()
 	p := New(func(resolve, reject func(any)) error {
 		resolve("success")
 		return nil
@@ -1775,7 +1773,6 @@ func TestAwaitTimeoutNotPositive(t *testing.T) {
 
 // 测试Await - 超时
 func TestAwaitTimeout(t *testing.T) {
-	t.Parallel()
 	p := New(func(resolve, reject func(any)) error {
 		SetTimeout(func() {
 			resolve("success")
@@ -1794,7 +1791,6 @@ func TestAwaitTimeout(t *testing.T) {
 
 // 测试Await - 拒绝的Promise
 func TestAwaitRejectedPromise(t *testing.T) {
-	t.Parallel()
 	p := New(func(resolve, reject func(any)) error {
 		reject("error")
 		return nil
@@ -1811,7 +1807,6 @@ func TestAwaitRejectedPromise(t *testing.T) {
 
 // 测试Delay函数
 func TestDelay(t *testing.T) {
-	t.Parallel()
 	val := "value"
 
 	if _, err := Await(Delay(val, 50), 40); err == nil {
