@@ -239,7 +239,9 @@ func Map(mapper func(item any) any, proms ...any) Promise {
 
 	result := make([]any, len(proms))
 	for index, item := range proms {
-		result[index] = mapper(item)
+		result[index] = Resolve(item).Then(func(v any) (any, error) {
+			return mapper(v), nil
+		}, nil)
 	}
 
 	return All(result...)
