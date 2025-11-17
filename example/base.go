@@ -1,4 +1,4 @@
-package example
+package promise_test
 
 import "github.com/TikaFlow/promise-go"
 
