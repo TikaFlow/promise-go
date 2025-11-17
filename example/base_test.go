@@ -1,80 +1,100 @@
 package promise_test
 
-import "github.com/TikaFlow/promise-go"
+import (
+	"fmt"
+	"time"
+
+	"github.com/TikaFlow/promise-go"
+)
 
 // 基础用法
-func BaseExample() {
+func Example_base() {
 	p := promise.New(func(resolve, reject func(v any)) (err error) {
 		resolve("hello world")
 		return
 	})
 
 	p.Then(func(v any) (any, error) {
-		println(v.(string))
+		fmt.Println(v.(string))
 		return nil, nil
 	}, nil)
 
-	<-promise.Done()
+	time.Sleep(time.Millisecond * 50)
+
+	// Output:
+	// hello world
 }
 
 // 链式调用
-func ChainExample() {
+func Example_chain() {
 	p := promise.New(func(resolve, reject func(v any)) (err error) {
 		resolve("hello world")
 		return
 	})
 
 	p.Then(func(v any) (any, error) {
-		println(v.(string))
+		fmt.Println(v.(string))
 		return v, nil
 	}, nil).Then(func(v any) (any, error) {
-		println(v.(string))
+		fmt.Println(v.(string))
 		return v, nil
 	}, nil).Catch(func(err any) (any, error) {
-		println("Nothing happend here.")
+		fmt.Println("Nothing happend here.")
 		return nil, nil
 	}).Finally(func() (any, error) {
-		println("Finally.")
+		fmt.Println("Finally.")
 		return nil, nil
 	})
 
-	<-promise.Done()
+	time.Sleep(time.Millisecond * 50)
+
+	// Output:
+	// hello world
+	// hello world
+	// Finally.
 }
 
-// 宏任务 - 见 [DelayExample]
+// 宏任务 - 见 [Example_delay]
 
 // 微队列
-func MicroQueueExample() {
+func ExampleQueueMicrotask() {
 	promise.QueueMicrotask(func() {
-		println("Microtask 1")
+		fmt.Println("Microtask 1")
 	})
 	promise.QueueMicrotask(func() {
-		println("Microtask 2")
+		fmt.Println("Microtask 2")
 	})
 
-	<-promise.Done()
+	time.Sleep(time.Millisecond * 50)
+
+	// Output:
+	// Microtask 1
+	// Microtask 2
 }
 
 // 延迟执行
-func DelayExample() {
+func Example_delay() {
 	id1 := promise.SetTimeout(func() {
-		println("Timeout 1")
-	}, 600)
+		fmt.Println("Timeout 1")
+	}, 100)
 
 	var id2 int
 	id2 = promise.SetInterval(func() {
 		promise.ClearTimeout(id1)
 		promise.ClearInterval(id2)
-		println("Interval 1")
-	}, 300)
+		fmt.Println("Interval 1")
+	}, 50)
 
-	<-promise.Done()
+	time.Sleep(time.Millisecond * 200)
+
+	// Output:
+	// Interval 1
 }
 
 // Async与Await
-func AsyncAwaitExample() {
+func Example_asyncAwait() {
 	promise.Async(func() {
-		println("Macrotask 1")
+		fmt.Println("Macrotask 1")
 	})
 
 	p := promise.New(func(resolve, reject func(v any)) (err error) {
@@ -83,10 +103,14 @@ func AsyncAwaitExample() {
 	})
 	v, err := promise.Await(p, 1000)
 	if err != nil {
-		println(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
-	println(v.(string))
+	fmt.Println(v.(string))
 
-	<-promise.Done()
+	time.Sleep(time.Millisecond * 50)
+
+	// Output:
+	// Macrotask 1
+	// hello world
 }
