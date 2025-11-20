@@ -25,6 +25,7 @@ promiseImpl 表示 Promise 的具体实现类。
 type promiseImpl struct {
 	state           string
 	result          any
+	dataLock        sync.RWMutex
 	settledHandlers chan *handler
 	settled         chan struct{}
 	resolved        sync.Once
@@ -34,6 +35,8 @@ type promiseImpl struct {
 [Promise.State]
 */
 func (prom *promiseImpl) State() string {
+	prom.dataLock.RLock()
+	defer prom.dataLock.RUnlock()
 	return prom.state
 }
 
@@ -41,6 +44,8 @@ func (prom *promiseImpl) State() string {
 [Promise.Result]
 */
 func (prom *promiseImpl) Result() any {
+	prom.dataLock.RLock()
+	defer prom.dataLock.RUnlock()
 	return prom.result
 }
 
@@ -65,7 +70,7 @@ func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected ThenCallback)
 		prom:        prom2.(*promiseImpl),
 	}
 
-	if prom.state != Pending {
+	if prom.State() != Pending {
 		flushHandlers(prom)
 	}
 	// 2.2.7 then 方法返回的新 Promise 实例的状态由回调函数的执行结果决定
@@ -109,5 +114,5 @@ func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
 [fmt.Stringer.String]
 */
 func (prom *promiseImpl) String() string {
-	return fmt.Sprintf("Promise<%s>, result: %v", prom.state, prom.result)
+	return fmt.Sprintf("Promise<%s>, result: %v", prom.State(), prom.Result())
 }

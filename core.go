@@ -18,8 +18,8 @@ var (
 	loopTimer      *time.Timer   = time.NewTimer(timeout + margin)
 	done           chan struct{} = make(chan struct{})
 	eventLoopID    uint64        = 0
-	timeoutLock    sync.Mutex
-	timerLock      sync.Mutex
+	timeoutLock    sync.RWMutex
+	LoopTimerLock  sync.Mutex
 )
 
 func init() {
@@ -135,10 +135,13 @@ loop:
 				case <-done:
 					break loop
 				case <-loopTimer.C:
+					timeoutLock.RLock()
 					if timeout == magic {
+						timeoutLock.RUnlock()
 						resetLoopTimer()
 						continue loop
 					}
+					timeoutLock.RUnlock()
 					close(done)
 				}
 			}

@@ -19,7 +19,7 @@ func resolvePromise(prom *promiseImpl, value any) {
 		return
 	}
 
-	if prom.state != Pending {
+	if prom.State() != Pending {
 		return
 	}
 
@@ -46,8 +46,10 @@ func resolvePromise(prom *promiseImpl, value any) {
 	// 2.3.3 同上
 
 	// 2.3.4 其他情况，则使用 value 作为已决值
+	prom.dataLock.Lock()
 	prom.state = Fulfilled
 	prom.result = value
+	prom.dataLock.Unlock()
 	close(prom.settled)
 	callHooks(PromiseSettled, prom)
 	callHooks(PromiseFulfilled, prom)
@@ -66,12 +68,14 @@ func rejectPromsie(prom *promiseImpl, reason any) {
 		return
 	}
 
-	if prom.state != Pending {
+	if prom.State() != Pending {
 		return
 	}
 
+	prom.dataLock.Lock()
 	prom.state = Rejected
 	prom.result = reason
+	prom.dataLock.Unlock()
 	close(prom.settled)
 	callHooks(PromiseSettled, prom)
 	callHooks(PromiseRejected, prom)
@@ -79,8 +83,8 @@ func rejectPromsie(prom *promiseImpl, reason any) {
 }
 
 func resetLoopTimer() {
-	timerLock.Lock()
-	defer timerLock.Unlock()
+	LoopTimerLock.Lock()
+	defer LoopTimerLock.Unlock()
 
 	if !loopTimer.Stop() {
 		select {
@@ -88,6 +92,8 @@ func resetLoopTimer() {
 		default:
 		}
 	}
+	timeoutLock.RLock()
+	defer timeoutLock.RUnlock()
 	loopTimer.Reset(timeout + margin)
 }
 
@@ -99,14 +105,14 @@ func flushHandlers(cur *promiseImpl) {
 			job := func() {
 				var res any
 				var err error
-				if cur.state == Fulfilled {
+				if cur.State() == Fulfilled {
 					if hdl.onFulfilled == nil {
 						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.3）
-						resolvePromise(hdl.prom, cur.result)
+						resolvePromise(hdl.prom, cur.Result())
 						return
 					} else {
 						// 2.2.2
-						res, err = hdl.onFulfilled(cur.result)
+						res, err = hdl.onFulfilled(cur.Result())
 						if err != nil {
 							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
 							rejectPromsie(hdl.prom, res)
@@ -116,11 +122,11 @@ func flushHandlers(cur *promiseImpl) {
 				} else { // 必然是 Rejected
 					if hdl.onRejected == nil {
 						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.4）
-						rejectPromsie(hdl.prom, cur.result)
+						rejectPromsie(hdl.prom, cur.Result())
 						return
 					} else {
 						// 2.2.3
-						res, err = hdl.onRejected(cur.result)
+						res, err = hdl.onRejected(cur.Result())
 						if err != nil {
 							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
 							rejectPromsie(hdl.prom, res)
