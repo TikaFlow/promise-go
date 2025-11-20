@@ -83,8 +83,8 @@ func rejectPromsie(prom *promiseImpl, reason any) {
 }
 
 func resetLoopTimer() {
-	LoopTimerLock.Lock()
-	defer LoopTimerLock.Unlock()
+	loopTimerLock.Lock()
+	defer loopTimerLock.Unlock()
 
 	if !loopTimer.Stop() {
 		select {

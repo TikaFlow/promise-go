@@ -19,7 +19,7 @@ var (
 	done           chan struct{} = make(chan struct{})
 	eventLoopID    uint64        = 0
 	timeoutLock    sync.RWMutex
-	LoopTimerLock  sync.Mutex
+	loopTimerLock  sync.Mutex
 )
 
 func init() {
