@@ -33,10 +33,10 @@ func resolvePromise(prom *promiseImpl, value any) {
 	if x, ok := value.(Promise); ok {
 		// 2.3.2 如果已决值是 Promise 对象，则采用其状态
 		QueueMicrotask(func() {
-			x.Then(func(v any) (any, error) {
+			x.Then(func(v any) (any, any) {
 				resolvePromise(prom, v)
 				return nil, nil
-			}, func(r any) (any, error) {
+			}, func(r any) (any, any) {
 				rejectPromsie(prom, r)
 				return nil, nil
 			})
@@ -104,7 +104,7 @@ func flushHandlers(cur *promiseImpl) {
 		case hdl := <-cur.settledHandlers:
 			job := func() {
 				var res any
-				var err error
+				var err any
 				if cur.State() == Fulfilled {
 					if hdl.onFulfilled == nil {
 						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.3）
@@ -115,7 +115,7 @@ func flushHandlers(cur *promiseImpl) {
 						res, err = hdl.onFulfilled(cur.Result())
 						if err != nil {
 							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
-							rejectPromsie(hdl.prom, res)
+							rejectPromsie(hdl.prom, err)
 							return
 						}
 					}
@@ -129,7 +129,7 @@ func flushHandlers(cur *promiseImpl) {
 						res, err = hdl.onRejected(cur.Result())
 						if err != nil {
 							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
-							rejectPromsie(hdl.prom, res)
+							rejectPromsie(hdl.prom, err)
 							return
 						}
 					}

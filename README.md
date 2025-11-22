@@ -273,12 +273,6 @@ p.Then(func(v any) (any, error) {
 }, nil)
 ```
 
-#### 错误信息
-
-`ThenCallback`和`FinallyCallback`回调函数中，如果有报错，请**务必**将错误信息放入在`v`中，并在`err`中放入简单错误信息（也不能为`nil`）。
-
-这是为了支持任意类型的错误信息，即此时应该返回`(detail, summary)`格式的错误，而不是`(nil, err)`。
-
 ### 性能考虑
 
 #### 定时器精度
@@ -290,10 +284,6 @@ p.Then(func(v any) (any, error) {
 大量的微任务或宏任务可能会影响性能，特别是在高并发场景下。请合理使用这些功能。
 
 ### 常见陷阱
-
-#### 错误的返回值
-
-在`Then`（及`Catch`、`Finally`）回调中使用不正确的报错方式（即返回`(nil, err)`而不是`(detail, summary)`）会导致后续的`Promise`链接收`nil`。
 
 #### 阻塞事件循环
 

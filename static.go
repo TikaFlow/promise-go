@@ -1,7 +1,6 @@
 package promise
 
 import (
-	"errors"
 	"sync/atomic"
 	"time"
 )
@@ -19,19 +18,19 @@ func All(inputs ...any) Promise {
 		return Resolve(make([]any, 0))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		results := make([]any, len(inputs))
 		var count int32 = 0
 
 		for index, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, error) {
+			prom.Then(func(v any) (any, any) {
 				results[index] = v
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(inputs) {
 					resolve(results)
 				}
 				return nil, nil
-			}, func(reason any) (any, error) {
+			}, func(reason any) (any, any) {
 				reject(reason)
 				return nil, nil
 			})
@@ -53,7 +52,7 @@ func AllSettled(inputs ...any) Promise {
 		return Resolve(make([]map[string]any, 0))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		type result struct {
 			Status string
 			Value  any
@@ -78,13 +77,13 @@ func AllSettled(inputs ...any) Promise {
 				}
 				resolve(finalResults)
 			}
-			prom.Then(func(v any) (any, error) {
+			prom.Then(func(v any) (any, any) {
 				results[index] = result{Status: Fulfilled, Value: v}
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					settleData()
 				}
 				return nil, nil
-			}, func(reason any) (any, error) {
+			}, func(reason any) (any, any) {
 				results[index] = result{Status: Rejected, Reason: reason}
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					settleData()
@@ -115,7 +114,7 @@ func Any(inputs ...any) Promise {
 		return Reject(result)
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		length := len(inputs)
 		reasons := make([]any, length)
 
@@ -123,10 +122,10 @@ func Any(inputs ...any) Promise {
 
 		for index, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, error) {
+			prom.Then(func(v any) (any, any) {
 				resolve(v)
 				return nil, nil
-			}, func(reason any) (any, error) {
+			}, func(reason any) (any, any) {
 				reasons[index] = reason
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					result := make(map[string]any)
@@ -164,36 +163,30 @@ Await 等待 Promise 完成，并设定超时时间，以免无限等待。
   - prom 需要等待的 Promise 实例，如果不是 Promise 实例，则会被包装成 Promise。
   - timeout 超时时间，单位为毫秒。
 
-返回值：与 [ThenCallback] 相同，v 总是需要的值（包括错误信息），而 err 仅代表是否出错。
-
-v 的值可能是：
-
-  - 如果 Promise 在超时时间内未完成，则为超时错误。
-  - 如果 Promise 成功，v 为 Promise 解决值。
-  - 如果 Promise 拒绝，v 为 Promise 拒绝理由。
+返回值：v 是已决值，err 是拒绝理由，当 err 存在时，代表 Promise 被拒绝。
 */
-func Await(prom any, timeout int64) (v any, err error) {
-	negErr := errors.New("await timeout must be greater than 0")
+func Await(prom any, timeout int64) (v any, err any) {
 	if timeout <= 0 {
-		return negErr, negErr
+		return nil, "await timeout must be greater than 0"
 	}
 
 	timer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
 	defer timer.Stop()
 
-	timeoutErr := errors.New("TimeoutError: await timeout")
 	prom2, ok := prom.(Promise)
 	if !ok {
 		return prom, nil
 	}
 	select {
 	case <-prom2.Done():
-		v = prom2.Result()
+		res := prom2.Result()
 		if prom2.State() == Rejected {
-			err = errors.New("promise rejected")
+			err = res
+		} else {
+			v = res
 		}
 	case <-timer.C:
-		v, err = timeoutErr, timeoutErr
+		err = "TimeoutError: await timeout"
 	}
 
 	return
@@ -230,17 +223,17 @@ func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	result := make([]any, arrLen)
 	for index, item := range inputs {
 		prom = prom.
-			Then(func(any) (any, error) {
+			Then(func(any) (any, any) {
 				return item, nil
 			}, nil).
-			Then(func(v any) (any, error) {
+			Then(func(v any) (any, any) {
 				result[index] = v
 				return it(v, index, arrLen), nil
 			}, nil)
 	}
 
 	return prom.
-		Then(func(any) (any, error) {
+		Then(func(any) (any, any) {
 			return result, nil
 		}, nil)
 }
@@ -253,13 +246,13 @@ Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
   - timeout 延迟时间，单位为毫秒。
 */
 func Delay(prom any, millis int64) Promise {
-	return New(func(resolve, reject func(v any)) error {
-		Resolve(prom).Then(func(v2 any) (any, error) {
+	return New(func(resolve, reject func(v any)) any {
+		Resolve(prom).Then(func(v2 any) (any, any) {
 			SetTimeout(func() {
 				resolve(v2)
 			}, millis)
 			return nil, nil
-		}, func(r any) (any, error) {
+		}, func(r any) (any, any) {
 			reject(r)
 			return nil, nil
 		})
@@ -278,7 +271,7 @@ func Filter(filter func(item any) bool, inputs ...any) Promise {
 	return Map(func(item any) any {
 		return All(item, filter(item))
 	}, inputs...).
-		Then(func(v any) (any, error) {
+		Then(func(v any) (any, any) {
 			values := v.([]any)
 			result := make([]any, 0)
 			for _, item := range values {
@@ -313,7 +306,7 @@ func Map(mapper func(item any) any, inputs ...any) Promise {
 
 	result := make([]any, len(inputs))
 	for index, item := range inputs {
-		result[index] = Resolve(item).Then(func(v any) (any, error) {
+		result[index] = Resolve(item).Then(func(v any) (any, any) {
 			return mapper(v), nil
 		}, nil)
 	}
@@ -331,7 +324,7 @@ PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve �
 */
 func PromiseWithResolvers() (Promise, func(any), func(any)) {
 	var resolve, reject func(any)
-	p := New(func(res func(any), rej func(any)) error {
+	p := New(func(res func(any), rej func(any)) any {
 		resolve = res
 		reject = rej
 		return nil
@@ -348,17 +341,17 @@ func Race(inputs ...any) Promise {
 		return Reject("TypeError: nil is not iterable")
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		if len(inputs) == 0 {
 			return nil
 		}
 
 		for _, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, error) {
+			prom.Then(func(v any) (any, any) {
 				resolve(v)
 				return nil, nil
-			}, func(reason any) (any, error) {
+			}, func(reason any) (any, any) {
 				reject(reason)
 				return nil, nil
 			})
@@ -392,7 +385,7 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 	}
 
 	return init.
-		Then(func(v any) (any, error) {
+		Then(func(v any) (any, any) {
 			if v == nil && len(inputs) == 1 {
 				return inputs[0], nil
 			}
@@ -402,7 +395,7 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 				acc = reducer(acc, item)
 				return nil
 			}, inputs...).
-				Then(func(v any) (any, error) {
+				Then(func(v any) (any, any) {
 					return acc, nil
 				}, nil)
 			return result, nil
@@ -416,7 +409,7 @@ Reject 返回一个已拒绝的 Promise，拒绝理由为指定值，详见 [MDN
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 */
 func Reject(reason any) Promise {
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		reject(reason)
 		return nil
 	})
@@ -434,7 +427,7 @@ func Resolve(value any) Promise {
 		return prom
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		resolve(value)
 		return nil
 	})
@@ -467,7 +460,7 @@ func Some(num int, inputs ...any) Promise {
 		return Reject("RangeError: not enough promises to resolve")
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return New(func(resolve, reject func(v any)) any {
 		threshold := len(inputs) - num + 1
 		values := make([]any, 0, num)
 		reasons := make([]any, 0, threshold)
@@ -476,13 +469,13 @@ func Some(num int, inputs ...any) Promise {
 
 		for _, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, error) {
+			prom.Then(func(v any) (any, any) {
 				values = append(values, v)
 				if newCount := atomic.AddInt32(&resCount, 1); int(newCount) == num {
 					resolve(values)
 				}
 				return nil, nil
-			}, func(reason any) (any, error) {
+			}, func(reason any) (any, any) {
 				reasons = append(reasons, reason)
 				if newCount := atomic.AddInt32(&rejCount, 1); int(newCount) == threshold {
 					result := make(map[string]any)
@@ -510,8 +503,8 @@ Try 接受一个任意类型的回调函数（无论其是同步或异步，返�
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/try
 */
-func Try(fn func(...any) (any, error), args ...any) Promise {
-	return New(func(resolve, reject func(v any)) error {
+func Try(fn func(...any) (any, any), args ...any) Promise {
+	return New(func(resolve, reject func(v any)) any {
 		if fn == nil {
 			reject("Promise executor must be a function")
 			return nil

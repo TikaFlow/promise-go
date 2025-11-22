@@ -28,10 +28,9 @@ ThenCallback 是 Promise 已决时的回调函数（成功或失败）。
   - 当它作为 onFulfilled 回调函数时，它接收 Promise 的结果值作为参数。
   - 当它作为 onRejected 回调函数时，它接收 Promise 的拒绝理由作为参数。
 
-当回调函数执行遇到错误时（意味着 Then 方法将会返回一个已拒绝的 Promise 实例），
-err 仅代表出错，但应该将错误信息包含在 v 中（以支持任意类型），此时返回的是 (detail, summary) 格式的错误信息。
+当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
 */
-type ThenCallback func(any) (v any, err error)
+type ThenCallback func(any) (v any, err any)
 
 /*
 FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数。
@@ -41,18 +40,18 @@ FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数。
   - 返回值是一个已拒绝的 Promise 实例，将以同样的理由拒绝新 Promise。
   - 执行中报错，将以同样的理由拒绝新 Promise。
 
-报错和错误格式与 [ThenCallback] 相同。
+当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
 */
-type FinallyCallback func() (v any, err error)
+type FinallyCallback func() (v any, err any)
 
 /*
 Executor 是 Promise 构造函数的执行器。
 它接收两个参数：resolve 和 reject，分别用于解决和拒绝 Promise。
 执行器函数在 Promise 实例化时立即调用，且只能调用一次。
 
-如果执行器函数抛出异常，则 Promise 会被拒绝，且拒绝理由为该异常。
+如果执行器函数返回一个非 nil 值 err，则 Promise 会被拒绝，且拒绝理由为 err。
 */
-type Executor func(resolve, reject func(v any)) (err error)
+type Executor func(resolve, reject func(v any)) (err any)
 
 /*
 Promise 是一个拥有 then 方法的对象，其行为符合 Promises/A+ 规范。

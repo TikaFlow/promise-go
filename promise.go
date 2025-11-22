@@ -1,7 +1,6 @@
 package promise
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 )
@@ -60,7 +59,7 @@ func (prom *promiseImpl) Done() <-chan struct{} {
 [Promise.Then]
 */
 func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected ThenCallback) Promise {
-	prom2 := New(func(resolve, reject func(v any)) error {
+	prom2 := New(func(resolve, reject func(v any)) any {
 		return nil
 	})
 	callHooks(PromiseChained, prom)
@@ -88,7 +87,7 @@ func (prom *promiseImpl) Catch(onRejected ThenCallback) Promise {
 [Promise.Finally]
 */
 func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
-	cb := func(v any) (any, error) {
+	cb := func(v any) (any, any) {
 		if onFinally == nil {
 			return v, nil
 		}
@@ -101,7 +100,7 @@ func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
 		if result, ok := res.(Promise); ok {
 			if result.State() == Rejected {
 				reason := result.Result()
-				return reason, errors.New("finally callback returns a rejected Promise")
+				return nil, reason
 			}
 		}
 

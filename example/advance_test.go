@@ -30,20 +30,20 @@ func ExampleSetTimeout_nested() {
 
 // 批量处理
 func ExampleAll() {
-	p1 := promise.New(func(resolve, reject func(v any)) (err error) {
+	p1 := promise.New(func(resolve, reject func(v any)) (err any) {
 		resolve("hello world1")
 		return
 	})
-	p2 := promise.New(func(resolve, reject func(v any)) (err error) {
+	p2 := promise.New(func(resolve, reject func(v any)) (err any) {
 		resolve("hello world2")
 		return
 	})
-	p3 := promise.New(func(resolve, reject func(v any)) (err error) {
+	p3 := promise.New(func(resolve, reject func(v any)) (err any) {
 		resolve("hello world3")
 		return
 	})
 
-	promise.All(p1, p2, p3).Then(func(v any) (any, error) {
+	promise.All(p1, p2, p3).Then(func(v any) (any, any) {
 		fmt.Println(v.([]any)[0].(string))
 		fmt.Println(v.([]any)[1].(string))
 		fmt.Println(v.([]any)[2].(string))
