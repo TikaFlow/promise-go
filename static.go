@@ -144,17 +144,28 @@ func Any(inputs ...any) Promise {
 
 /*
 Async 将代码作为一个异步任务执行。
-主要作用是被事件循环调度，并不会开启新的go程。如果 fn 是一个耗时任务，依然会阻塞事件循环。
-使用此函数包裹同步代码后，将完美模拟事件循环中 Promise 的行为，详见 [MDN]。
+将会开启新的go程，执行 fn 函数，可用于执行耗时任务，避免阻塞事件循环。
 
-这是一个语法糖，等价于以下语句：
-
-	SetTimeout(fn, 0)
-
-[MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Execution_model#%E4%BD%9C%E4%B8%9A%E9%98%9F%E5%88%97%E4%B8%8E%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF
+返回一个 Promise 实例，并在 fn 函数执行完成后变为已决状态，
+若 fn 函数抛出异常，则 Promise 实例会被拒绝，且拒绝理由为异常信息。
 */
-func Async(fn func()) {
-	SetTimeout(fn, 0)
+func Async(fn func()) Promise {
+	if fn == nil {
+		return Reject("TypeError: fn must be a function")
+	}
+
+	return New(func(resolve, reject func(v any)) any {
+		go func() {
+			defer func() {
+				if err := recover(); err != nil {
+					reject(err)
+				}
+			}()
+			fn()
+			resolve(nil)
+		}()
+		return nil
+	})
 }
 
 /*

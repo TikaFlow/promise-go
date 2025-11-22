@@ -94,6 +94,8 @@ func Example_delay() {
 // Async与Await
 func Example_asyncAwait() {
 	promise.Async(func() {
+		// 模拟耗时任务
+		time.Sleep(time.Millisecond * 100)
 		fmt.Println("Macrotask 1")
 	})
 
@@ -108,9 +110,9 @@ func Example_asyncAwait() {
 	}
 	fmt.Println(v.(string))
 
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Millisecond * 150)
 
 	// Output:
-	// Macrotask 1
 	// hello world
+	// Macrotask 1
 }

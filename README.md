@@ -16,6 +16,8 @@
     <a href="https://github.com/TikaFlow/promise-go"><img src="https://img.shields.io/maintenance/active/2025"></a>
 </div>
 
+---
+
 `Promise`的`Golang`实现，其行为符合`Promises/A+`规范，并参考`Promise ES`规范实现，尽可能模拟了`JavaScript`事件循环中`Promise`的行为。
 
 ## 项目概述
@@ -65,7 +67,7 @@ import "github.com/TikaFlow/promise-go"
 
 func main() {
     // 推荐将 Promise 相关代码包装为异步任务，更符合事件循环机制
-    promise.Async(func() {
+    promise.SetTimeout(func() {
         // 创建一个成功的 Promise
         p := promise.New(func(resolve, reject func(v any)) (err error) {
             // 模拟异步操作
@@ -73,7 +75,7 @@ func main() {
                 resolve("操作成功完成")
             }, 1000)
             return
-        })
+        }, 0)
         
         // 处理 Promise
         p.Then(func(v any) (any, error) {

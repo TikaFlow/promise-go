@@ -290,7 +290,7 @@ func TestPromiseBasicReject(t *testing.T) {
 // 测试Promise的格式化输出
 func TestPromiseString(t *testing.T) {
 	t.Parallel()
-	Async(func() {
+	SetTimeout(func() {
 		p := New(func(resolve, reject func(any)) any {
 			resolve("success")
 			return nil
@@ -301,7 +301,7 @@ func TestPromiseString(t *testing.T) {
 		if result != expected {
 			t.Errorf("Expected string '%s', got '%s'", expected, result)
 		}
-	})
+	}, 0)
 
 	<-Done()
 }
@@ -1385,7 +1385,7 @@ func TestPromiseThenable(t *testing.T) {
 	t.Parallel()
 	result := "init"
 
-	Async(func() {
+	SetTimeout(func() {
 		p1, resolveP1, _ := PromiseWithResolvers()
 		p2 := New(func(resolve, reject func(any)) any {
 			resolve(p1)
@@ -1412,7 +1412,7 @@ func TestPromiseThenable(t *testing.T) {
 		QueueMicrotask(func() {
 			result += " =>microtask"
 		})
-	})
+	}, 0)
 
 	SetTimeout(func() {
 		expected := "init =>p1-resolved =>microtask =>p1:microtask =>p2<thenable value> =>p2:microtask"
@@ -1534,11 +1534,11 @@ func TestSetTimeoutZeroMillis(t *testing.T) {
 		str = "timeout value"
 	}, 0)
 
-	Async(func() {
+	SetTimeout(func() {
 		if str != "timeout value" {
 			t.Errorf("Expected str 'timeout value', got %s", str)
 		}
-	})
+	}, 0)
 
 	<-Done()
 }
@@ -1840,7 +1840,7 @@ func TestDelay(t *testing.T) {
 func TestAsyncCallOrderMicro(t *testing.T) {
 	t.Parallel()
 	result := ""
-	Async(func() {
+	SetTimeout(func() {
 		var res func(any)
 		p := Resolve("success")
 		p.Then(func(v any) (any, any) {
@@ -1862,13 +1862,13 @@ func TestAsyncCallOrderMicro(t *testing.T) {
 		QueueMicrotask(func() {
 			result += "[C]"
 		})
-	})
+	}, 0)
 
-	Async(func() {
+	SetTimeout(func() {
 		if result != "[A][B][C][D][E]" {
 			t.Errorf("Expected result1 '[A][B][C][D][E]', got %s", result)
 		}
-	})
+	}, 0)
 
 	<-Done()
 }
@@ -1930,7 +1930,7 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 	t.Parallel()
 	var result string
 
-	Async(func() {
+	SetTimeout(func() {
 		result += "[01]"
 
 		SetTimeout(func() {
@@ -2125,7 +2125,7 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 		})
 
 		result += "-[03]"
-	})
+	}, 0)
 
 	SetTimeout(func() {
 
