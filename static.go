@@ -344,6 +344,31 @@ func PromiseWithResolvers() (Promise, func(any), func(any)) {
 }
 
 /*
+Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 Promise 的函数，
+原函数的第二个返回值将被视为 Promise 的拒绝理由。
+
+如果原函数 panic，新 Promise 会被拒绝，拒绝理由为 panic 值。
+*/
+func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Promise {
+	return func(args ...A) Promise {
+		return New(func(resolve, reject func(v any)) any {
+			defer func() {
+				if r := recover(); r != nil {
+					reject(r)
+				}
+			}()
+			res, err := fn(args...)
+			if err != nil {
+				reject(err)
+			} else {
+				resolve(res)
+			}
+			return nil
+		})
+	}
+}
+
+/*
 Race 等待第一个 Promise 完成。
   - 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由跟随第一个完成的 Promise。
 */

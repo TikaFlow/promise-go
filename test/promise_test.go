@@ -16,6 +16,51 @@ func TestMain(m *testing.M) {
 	<-Done()
 }
 
+// 测试Promisify方法
+func TestPromisify(t *testing.T) {
+	t.Parallel()
+	fn := func(vs ...int) (int, error) {
+		if len(vs) == 0 {
+			panic("vs is empty")
+		}
+
+		v := vs[0]
+		if v < 0 {
+			return v, errors.New("v is negative")
+		}
+		return v, nil
+	}
+
+	// 测试panic
+	p1 := Promisify(fn)()
+	p1.Then(nil, func(v any) (any, any) {
+		if v != "vs is empty" {
+			t.Errorf("Expected panic 'vs is empty', got %v", v)
+		}
+		return nil, nil
+	})
+
+	// 测试正常情况
+	p2 := Promisify(fn)(1)
+	p2.Then(func(v any) (any, any) {
+		if v.(int) != 1 {
+			t.Errorf("Expected value 1, got %v", v.(int))
+		}
+		return nil, nil
+	}, nil)
+
+	// 测试拒绝情况
+	p3 := Promisify(fn)(-1)
+	p3.Then(nil, func(v any) (any, any) {
+		if v.(error).Error() != "v is negative" {
+			t.Errorf("Expected error 'v is negative', got %v", v.(error).Error())
+		}
+		return nil, nil
+	})
+
+	<-Done()
+}
+
 // 测试Reduce方法 - 成功累加
 func TestReduceSuccess(t *testing.T) {
 	t.Parallel()
