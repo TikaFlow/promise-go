@@ -9,12 +9,12 @@ import (
 
 // 基础用法
 func Example_base() {
-	p := promise.New(func(resolve, reject func(v any)) (err any) {
+	p := promise.New(func(resolve func(v any), reject func(v error)) (err error) {
 		resolve("hello world")
 		return
 	})
 
-	p.Then(func(v any) (any, any) {
+	p.Then(func(v any) (any, error) {
 		fmt.Println(v.(string))
 		return nil, nil
 	}, nil)
@@ -27,21 +27,21 @@ func Example_base() {
 
 // 链式调用
 func Example_chain() {
-	p := promise.New(func(resolve, reject func(v any)) (err any) {
+	p := promise.New(func(resolve func(v any), reject func(v error)) (err error) {
 		resolve("hello world")
 		return
 	})
 
-	p.Then(func(v any) (any, any) {
+	p.Then(func(v any) (any, error) {
 		fmt.Println(v.(string))
 		return v, nil
-	}, nil).Then(func(v any) (any, any) {
+	}, nil).Then(func(v any) (any, error) {
 		fmt.Println(v.(string))
 		return v, nil
-	}, nil).Catch(func(err any) (any, any) {
+	}, nil).Catch(func(err error) (any, error) {
 		fmt.Println("Nothing happend here.")
 		return nil, nil
-	}).Finally(func() (any, any) {
+	}).Finally(func() (any, error) {
 		fmt.Println("Finally.")
 		return nil, nil
 	})
@@ -99,7 +99,7 @@ func Example_asyncAwait() {
 		fmt.Println("Macrotask 1")
 	})
 
-	p := promise.New(func(resolve, reject func(v any)) (err any) {
+	p := promise.New(func(resolve func(v any), reject func(v error)) (err error) {
 		resolve("hello world")
 		return
 	})

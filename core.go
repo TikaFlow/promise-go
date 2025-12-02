@@ -64,8 +64,9 @@ func New(exec Executor) Promise {
 	}
 
 	prom := &promiseImpl{
+		value:           nil,
+		reason:          nil,
 		state:           Pending,
-		result:          nil,
 		settledHandlers: make(chan *handler, 128),
 		settled:         make(chan struct{}),
 	}
@@ -76,7 +77,7 @@ func New(exec Executor) Promise {
 			resolvePromise(prom, data)
 		})
 	}
-	rej := func(reason any) {
+	rej := func(reason error) {
 		prom.resolved.Do(func() {
 			rejectPromsie(prom, reason)
 		})

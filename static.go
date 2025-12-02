@@ -12,25 +12,25 @@ All 等待所有输入解决。
 */
 func All(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
 		return Resolve(make([]any, 0))
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		results := make([]any, len(inputs))
 		var count int32 = 0
 
 		for index, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, any) {
+			prom.Then(func(v any) (any, error) {
 				results[index] = v
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(inputs) {
 					resolve(results)
 				}
 				return nil, nil
-			}, func(reason any) (any, any) {
+			}, func(reason error) (any, error) {
 				reject(reason)
 				return nil, nil
 			})
@@ -46,13 +46,13 @@ AllSettled 等待所有 Promise 完成（无论成功失败）。
 */
 func AllSettled(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
 		return Resolve(make([]map[string]any, 0))
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		type result struct {
 			Status string
 			Value  any
@@ -77,13 +77,13 @@ func AllSettled(inputs ...any) Promise {
 				}
 				resolve(finalResults)
 			}
-			prom.Then(func(v any) (any, any) {
+			prom.Then(func(v any) (any, error) {
 				results[index] = result{Status: Fulfilled, Value: v}
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					settleData()
 				}
 				return nil, nil
-			}, func(reason any) (any, any) {
+			}, func(reason error) (any, error) {
 				results[index] = result{Status: Rejected, Reason: reason}
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
 					settleData()
@@ -104,35 +104,28 @@ Any 等待 inputs 中第一个成功解决的元素。
 */
 func Any(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
-		result := make(map[string]any)
-		result["errors"] = make([]any, 0)
-		result["stack"] = "AggregateError: All promises were rejected"
-		result["message"] = "All promises were rejected"
-		return Reject(result)
+		err := NewAggregateError(make([]error, 0), "All promises were rejected", "All promises were rejected")
+		return Reject(err)
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		length := len(inputs)
-		reasons := make([]any, length)
+		reasons := make([]error, length)
 
 		var count int32 = 0
 
 		for index, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, any) {
+			prom.Then(func(v any) (any, error) {
 				resolve(v)
 				return nil, nil
-			}, func(reason any) (any, any) {
+			}, func(reason error) (any, error) {
 				reasons[index] = reason
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == length {
-					result := make(map[string]any)
-					result["errors"] = reasons
-					result["stack"] = "AggregateError: All promises were rejected"
-					result["message"] = "All promises were rejected"
-					reject(result)
+					reject(NewAggregateError(reasons, "All promises were rejected", "All promises were rejected"))
 				}
 				return nil, nil
 			})
@@ -151,14 +144,14 @@ Async 将代码作为一个异步任务执行。
 */
 func Async(fn func()) Promise {
 	if fn == nil {
-		return Reject("TypeError: fn must be a function")
+		return Reject(NewTypeError("fn must be a function"))
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(reason error)) error {
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
-					reject(err)
+					reject(NewUnexpectedError(err))
 				}
 			}()
 			fn()
@@ -176,9 +169,9 @@ Await 等待 Promise 完成，并设定超时时间，以免无限等待。
 
 返回值：v 是已决值，err 是拒绝理由，当 err 存在时，代表 Promise 被拒绝。
 */
-func Await(prom any, timeout int64) (v any, err any) {
+func Await(prom any, timeout int64) (v any, err error) {
 	if timeout <= 0 {
-		return nil, "await timeout must be greater than 0"
+		return nil, NewRangeError("await timeout must be greater than 0")
 	}
 
 	timer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
@@ -190,14 +183,13 @@ func Await(prom any, timeout int64) (v any, err any) {
 	}
 	select {
 	case <-prom2.Done():
-		res := prom2.Result()
 		if prom2.State() == Rejected {
-			err = res
+			err = prom2.Reason()
 		} else {
-			v = res
+			v = prom2.Value()
 		}
 	case <-timer.C:
-		err = "TimeoutError: await timeout"
+		err = NewTimeoutError("await timeout")
 	}
 
 	return
@@ -220,13 +212,13 @@ Each 按顺序等待数组中的每个元素完成，每个元素的完成结果
 */
 func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
 		return Resolve(make([]any, 0))
 	}
 	if it == nil {
-		return Reject("TypeError: nil is not a function")
+		return Reject(NewTypeError("nil is not a function"))
 	}
 
 	prom := Resolve("start")
@@ -234,17 +226,17 @@ func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	result := make([]any, arrLen)
 	for index, item := range inputs {
 		prom = prom.
-			Then(func(any) (any, any) {
+			Then(func(any) (any, error) {
 				return item, nil
 			}, nil).
-			Then(func(v any) (any, any) {
+			Then(func(v any) (any, error) {
 				result[index] = v
 				return it(v, index, arrLen), nil
 			}, nil)
 	}
 
 	return prom.
-		Then(func(any) (any, any) {
+		Then(func(any) (any, error) {
 			return result, nil
 		}, nil)
 }
@@ -257,13 +249,13 @@ Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
   - timeout 延迟时间，单位为毫秒。
 */
 func Delay(prom any, millis int64) Promise {
-	return New(func(resolve, reject func(v any)) any {
-		Resolve(prom).Then(func(v2 any) (any, any) {
+	return New(func(resolve func(v any), reject func(r error)) error {
+		Resolve(prom).Then(func(v2 any) (any, error) {
 			SetTimeout(func() {
 				resolve(v2)
 			}, millis)
 			return nil, nil
-		}, func(r any) (any, any) {
+		}, func(r error) (any, error) {
 			reject(r)
 			return nil, nil
 		})
@@ -282,7 +274,7 @@ func Filter(filter func(item any) bool, inputs ...any) Promise {
 	return Map(func(item any) any {
 		return All(item, filter(item))
 	}, inputs...).
-		Then(func(v any) (any, any) {
+		Then(func(v any) (any, error) {
 			values := v.([]any)
 			result := make([]any, 0)
 			for _, item := range values {
@@ -306,18 +298,18 @@ Map 对输入数组中的每个元素应用一个函数，返回一个新的 Pro
 */
 func Map(mapper func(item any) any, inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
 		return Resolve(make([]any, 0))
 	}
 	if mapper == nil {
-		return Reject("TypeError: nil is not a function")
+		return Reject(NewTypeError("nil is not a function"))
 	}
 
 	result := make([]any, len(inputs))
 	for index, item := range inputs {
-		result[index] = Resolve(item).Then(func(v any) (any, any) {
+		result[index] = Resolve(item).Then(func(v any) (any, error) {
 			return mapper(v), nil
 		}, nil)
 	}
@@ -333,9 +325,10 @@ PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve �
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
 */
-func PromiseWithResolvers() (Promise, func(any), func(any)) {
-	var resolve, reject func(any)
-	p := New(func(res func(any), rej func(any)) any {
+func PromiseWithResolvers() (Promise, func(any), func(error)) {
+	var resolve func(any)
+	var reject func(error)
+	p := New(func(res func(any), rej func(error)) error {
 		resolve = res
 		reject = rej
 		return nil
@@ -351,15 +344,15 @@ Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 P
 */
 func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Promise {
 	return func(args ...A) Promise {
-		return New(func(resolve, reject func(v any)) any {
+		return New(func(resolve func(v any), reject func(r error)) error {
 			defer func() {
 				if r := recover(); r != nil {
-					reject(r)
+					reject(NewUnexpectedError(r))
 				}
 			}()
 			res, err := fn(args...)
 			if err != nil {
-				reject(err)
+				reject(NewUnexpectedError(err))
 			} else {
 				resolve(res)
 			}
@@ -374,20 +367,20 @@ Race 等待第一个 Promise 完成。
 */
 func Race(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		if len(inputs) == 0 {
 			return nil
 		}
 
 		for _, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, any) {
+			prom.Then(func(v any) (any, error) {
 				resolve(v)
 				return nil, nil
-			}, func(reason any) (any, any) {
+			}, func(reason error) (any, error) {
 				reject(reason)
 				return nil, nil
 			})
@@ -421,7 +414,7 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 	}
 
 	return init.
-		Then(func(v any) (any, any) {
+		Then(func(v any) (any, error) {
 			if v == nil && len(inputs) == 1 {
 				return inputs[0], nil
 			}
@@ -431,7 +424,7 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 				acc = reducer(acc, item)
 				return nil
 			}, inputs...).
-				Then(func(v any) (any, any) {
+				Then(func(v any) (any, error) {
 					return acc, nil
 				}, nil)
 			return result, nil
@@ -444,8 +437,8 @@ Reject 返回一个已拒绝的 Promise，拒绝理由为指定值，详见 [MDN
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 */
-func Reject(reason any) Promise {
-	return New(func(resolve, reject func(v any)) any {
+func Reject(reason error) Promise {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		reject(reason)
 		return nil
 	})
@@ -463,7 +456,7 @@ func Resolve(value any) Promise {
 		return prom
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		resolve(value)
 		return nil
 	})
@@ -480,44 +473,38 @@ Some 等待 inputs 中前 num 个元素解决。
 */
 func Some(num int, inputs ...any) Promise {
 	if inputs == nil {
-		return Reject("TypeError: nil is not iterable")
+		return Reject(NewTypeError("nil is not iterable"))
 	}
 	if num <= 0 {
-		return Reject("RangeError: num must be greater than 0")
+		return Reject(NewRangeError("num must be greater than 0"))
 	}
 	if len(inputs) == 0 {
-		result := make(map[string]any)
-		result["errors"] = make([]any, 0)
-		result["stack"] = "AggregateError: All promises were rejected"
-		result["message"] = "All promises were rejected"
-		return Reject(result)
+		err := NewAggregateError(make([]error, 0), "All promises were rejected", "All promises were rejected")
+		return Reject(err)
 	}
 	if num > len(inputs) {
-		return Reject("RangeError: not enough promises to resolve")
+		return Reject(NewRangeError("no enough promises to resolve"))
 	}
 
-	return New(func(resolve, reject func(v any)) any {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		threshold := len(inputs) - num + 1
 		values := make([]any, 0, num)
-		reasons := make([]any, 0, threshold)
+		reasons := make([]error, 0, threshold)
 		var resCount int32 = 0
 		var rejCount int32 = 0
 
 		for _, item := range inputs {
 			prom := Resolve(item)
-			prom.Then(func(v any) (any, any) {
+			prom.Then(func(v any) (any, error) {
 				values = append(values, v)
 				if newCount := atomic.AddInt32(&resCount, 1); int(newCount) == num {
 					resolve(values)
 				}
 				return nil, nil
-			}, func(reason any) (any, any) {
+			}, func(reason error) (any, error) {
 				reasons = append(reasons, reason)
 				if newCount := atomic.AddInt32(&rejCount, 1); int(newCount) == threshold {
-					result := make(map[string]any)
-					result["errors"] = reasons
-					result["stack"] = "AggregateError: Too many promises were rejected"
-					result["message"] = "Too many promises were rejected"
+					result := NewAggregateError(reasons, "AggregateError: Too many promises were rejected", "Too many promises were rejected")
 					reject(result)
 				}
 				return nil, nil
@@ -539,16 +526,15 @@ Try 接受一个任意类型的回调函数（无论其是同步或异步，返�
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/try
 */
-func Try(fn func(...any) (any, any), args ...any) Promise {
-	return New(func(resolve, reject func(v any)) any {
+func Try(fn func(...any) (any, error), args ...any) Promise {
+	return New(func(resolve func(v any), reject func(r error)) error {
 		if fn == nil {
-			reject("Promise executor must be a function")
-			return nil
+			return NewTypeError("Promise executor must be a function")
 		}
 
 		result, err := fn(args...)
 		if err != nil {
-			reject(result)
+			reject(err)
 			return nil
 		}
 		resolve(result)

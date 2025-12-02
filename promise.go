@@ -10,7 +10,7 @@ handler 表示待处理的 Promise 回调。
 */
 type handler struct {
 	onFulfilled ThenCallback
-	onRejected  ThenCallback
+	onRejected  CatchCallback
 
 	/*
 	   即将返回的 Promise 实例（新）
@@ -22,8 +22,9 @@ type handler struct {
 promiseImpl 表示 Promise 的具体实现类。
 */
 type promiseImpl struct {
+	value           any
+	reason          error
 	state           string
-	result          any
 	dataLock        sync.RWMutex
 	settledHandlers chan *handler
 	settled         chan struct{}
@@ -40,15 +41,6 @@ func (prom *promiseImpl) State() string {
 }
 
 /*
-[Promise.Result]
-*/
-func (prom *promiseImpl) Result() any {
-	prom.dataLock.RLock()
-	defer prom.dataLock.RUnlock()
-	return prom.result
-}
-
-/*
 [Promise.Done]
 */
 func (prom *promiseImpl) Done() <-chan struct{} {
@@ -56,10 +48,28 @@ func (prom *promiseImpl) Done() <-chan struct{} {
 }
 
 /*
+[Promise.Value]
+*/
+func (prom *promiseImpl) Value() any {
+	prom.dataLock.RLock()
+	defer prom.dataLock.RUnlock()
+	return prom.value
+}
+
+/*
+[Promise.Reason]
+*/
+func (prom *promiseImpl) Reason() error {
+	prom.dataLock.RLock()
+	defer prom.dataLock.RUnlock()
+	return prom.reason
+}
+
+/*
 [Promise.Then]
 */
-func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected ThenCallback) Promise {
-	prom2 := New(func(resolve, reject func(v any)) any {
+func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected CatchCallback) Promise {
+	prom2 := New(func(resolve func(v any), reject func(r error)) error {
 		return nil
 	})
 	callHooks(PromiseChained, prom)
@@ -79,7 +89,7 @@ func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected ThenCallback)
 /*
 [Promise.Catch]
 */
-func (prom *promiseImpl) Catch(onRejected ThenCallback) Promise {
+func (prom *promiseImpl) Catch(onRejected CatchCallback) Promise {
 	return prom.Then(nil, onRejected)
 }
 
@@ -87,7 +97,7 @@ func (prom *promiseImpl) Catch(onRejected ThenCallback) Promise {
 [Promise.Finally]
 */
 func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
-	cb := func(v any) (any, any) {
+	res_cb := func(v any) (any, error) {
 		if onFinally == nil {
 			return v, nil
 		}
@@ -99,19 +109,32 @@ func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
 
 		if result, ok := res.(Promise); ok {
 			if result.State() == Rejected {
-				reason := result.Result()
+				reason := result.Reason()
 				return nil, reason
 			}
 		}
 
 		return v, nil
 	}
-	return prom.Then(cb, cb)
+	rej_cb := func(r error) (any, error) {
+		return res_cb(r)
+	}
+
+	return prom.Then(res_cb, rej_cb)
 }
 
 /*
 [fmt.Stringer.String]
 */
 func (prom *promiseImpl) String() string {
-	return fmt.Sprintf("Promise<%s>, result: %v", prom.State(), prom.Result())
+	prom.dataLock.RLock()
+	defer prom.dataLock.RUnlock()
+
+	if prom.state == Pending {
+		return fmt.Sprintf("Promise<%s>", prom.state)
+	}
+	if prom.state == Rejected {
+		return fmt.Sprintf("Promise<%s>, reason: %v", prom.state, prom.reason)
+	}
+	return fmt.Sprintf("Promise<%s>, value: %v", prom.state, prom.value)
 }

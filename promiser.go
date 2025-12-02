@@ -30,7 +30,9 @@ ThenCallback 是 Promise 已决时的回调函数（成功或失败）。
 
 当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
 */
-type ThenCallback func(any) (v any, err any)
+type ThenCallback func(any) (v any, err error)
+
+type CatchCallback func(error) (v any, err error)
 
 /*
 FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数。
@@ -42,7 +44,7 @@ FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数。
 
 当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
 */
-type FinallyCallback func() (v any, err any)
+type FinallyCallback func() (v any, err error)
 
 /*
 Executor 是 Promise 构造函数的执行器。
@@ -51,7 +53,7 @@ Executor 是 Promise 构造函数的执行器。
 
 如果执行器函数返回一个非 nil 值 err，则 Promise 会被拒绝，且拒绝理由为 err。
 */
-type Executor func(resolve, reject func(v any)) (err any)
+type Executor func(resolve func(v any), reject func(r error)) (err error)
 
 /*
 Promise 是一个拥有 then 方法的对象，其行为符合 Promises/A+ 规范。
@@ -63,19 +65,24 @@ type Promise interface {
 	State() string
 
 	/*
-		Result 返回 Promise 的结果值。
-	*/
-	Result() any
-
-	/*
 		Done 返回一个通道，当 Promise 状态变为 Fulfilled 或 Rejected 时，该通道会被关闭。
 	*/
 	Done() <-chan struct{}
 
 	/*
+		Value 返回 Promise 的结果值，如果 Promise 状态为 pending，则值为 nil。
+	*/
+	Value() any
+
+	/*
+		Reason 返回 Promise 的拒绝理由，如果 Promise 状态为 pending，则值为 nil。
+	*/
+	Reason() error
+
+	/*
 		Then 方法返回一个新的 Promise，其状态和结果值由 onFulfilled 或 onRejected 回调函数的执行结果决定。
 	*/
-	Then(onFulfilled, onRejected ThenCallback) Promise
+	Then(onFulfilled ThenCallback, onRejected CatchCallback) Promise
 
 	/*
 		Catch 方法返回一个新的 Promise，其状态和结果值由 onRejected 回调函数的执行结果决定，详见 [MDN]。
@@ -86,7 +93,7 @@ type Promise interface {
 
 		[MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch
 	*/
-	Catch(onRejected ThenCallback) Promise
+	Catch(onRejected CatchCallback) Promise
 
 	/*
 		Finally 方法返回一个新的 Promise，其状态和结果值与原 Promise 相同，以下情况除外：

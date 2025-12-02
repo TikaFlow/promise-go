@@ -25,7 +25,7 @@ func resolvePromise(prom *promiseImpl, value any) {
 
 	if value == prom {
 		// 2.3.1 如果 Promise 和已决值相同，则抛出 TypeError 异常
-		rejectPromsie(prom, "TypeError: Chaining cycle detected for promise")
+		rejectPromsie(prom, NewTypeError("Chaining cycle detected for promise"))
 		return
 	}
 
@@ -33,10 +33,10 @@ func resolvePromise(prom *promiseImpl, value any) {
 	if x, ok := value.(Promise); ok {
 		// 2.3.2 如果已决值是 Promise 对象，则采用其状态
 		QueueMicrotask(func() {
-			x.Then(func(v any) (any, any) {
+			x.Then(func(v any) (any, error) {
 				resolvePromise(prom, v)
 				return nil, nil
-			}, func(r any) (any, any) {
+			}, func(r error) (any, error) {
 				rejectPromsie(prom, r)
 				return nil, nil
 			})
@@ -48,7 +48,7 @@ func resolvePromise(prom *promiseImpl, value any) {
 	// 2.3.4 其他情况，则使用 value 作为已决值
 	prom.dataLock.Lock()
 	prom.state = Fulfilled
-	prom.result = value
+	prom.value = value
 	prom.dataLock.Unlock()
 	close(prom.settled)
 	callHooks(PromiseSettled, prom)
@@ -56,7 +56,7 @@ func resolvePromise(prom *promiseImpl, value any) {
 	flushHandlers(prom)
 }
 
-func rejectPromsie(prom *promiseImpl, reason any) {
+func rejectPromsie(prom *promiseImpl, reason error) {
 	if getGoroutineID() != eventLoopID {
 		SetTimeout(func() {
 			rejectPromsie(prom, reason)
@@ -74,7 +74,7 @@ func rejectPromsie(prom *promiseImpl, reason any) {
 
 	prom.dataLock.Lock()
 	prom.state = Rejected
-	prom.result = reason
+	prom.reason = reason
 	prom.dataLock.Unlock()
 	close(prom.settled)
 	callHooks(PromiseSettled, prom)
@@ -104,15 +104,15 @@ func flushHandlers(cur *promiseImpl) {
 		case hdl := <-cur.settledHandlers:
 			job := func() {
 				var res any
-				var err any
+				var err error
 				if cur.State() == Fulfilled {
 					if hdl.onFulfilled == nil {
 						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.3）
-						resolvePromise(hdl.prom, cur.Result())
+						resolvePromise(hdl.prom, cur.Value())
 						return
 					} else {
 						// 2.2.2
-						res, err = hdl.onFulfilled(cur.Result())
+						res, err = hdl.onFulfilled(cur.Value())
 						if err != nil {
 							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
 							rejectPromsie(hdl.prom, err)
@@ -122,11 +122,11 @@ func flushHandlers(cur *promiseImpl) {
 				} else { // 必然是 Rejected
 					if hdl.onRejected == nil {
 						// 2.2.1 如果回调不是函数，则忽略（穿透->2.2.7.4）
-						rejectPromsie(hdl.prom, cur.Result())
+						rejectPromsie(hdl.prom, cur.Reason())
 						return
 					} else {
 						// 2.2.3
-						res, err = hdl.onRejected(cur.Result())
+						res, err = hdl.onRejected(cur.Reason())
 						if err != nil {
 							// 2.2.7.2 如果回调函数抛出一个异常 e，则新 Promise 实例必须被拒绝，且拒绝原因为 e
 							rejectPromsie(hdl.prom, err)
