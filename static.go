@@ -345,17 +345,19 @@ Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 P
 func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Promise {
 	return func(args ...A) Promise {
 		return New(func(resolve func(v any), reject func(r error)) error {
-			defer func() {
-				if r := recover(); r != nil {
-					reject(NewUnexpectedError(r))
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						reject(NewUnexpectedError(r))
+					}
+				}()
+				res, err := fn(args...)
+				if err != nil {
+					reject(err)
+				} else {
+					resolve(res)
 				}
 			}()
-			res, err := fn(args...)
-			if err != nil {
-				reject(err)
-			} else {
-				resolve(res)
-			}
 			return nil
 		})
 	}
