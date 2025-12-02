@@ -52,8 +52,8 @@ func TestPromisify(t *testing.T) {
 	// 测试拒绝情况
 	p3 := Promisify(fn)(-1)
 	p3.Then(nil, func(v error) (any, error) {
-		if v.Error() != "UnexpectedError: v is negative" {
-			t.Errorf("Expected error 'UnexpectedError: v is negative', got %v", v.Error())
+		if v.Error() != "v is negative" {
+			t.Errorf("Expected error 'v is negative', got %v", v.Error())
 		}
 		return nil, nil
 	})

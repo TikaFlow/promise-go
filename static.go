@@ -352,7 +352,7 @@ func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Prom
 			}()
 			res, err := fn(args...)
 			if err != nil {
-				reject(NewUnexpectedError(err))
+				reject(err)
 			} else {
 				resolve(res)
 			}
