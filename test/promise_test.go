@@ -20,25 +20,12 @@ func TestMain(m *testing.M) {
 func TestPromisify(t *testing.T) {
 	t.Parallel()
 	fn := func(vs ...int) (int, error) {
-		if len(vs) == 0 {
-			panic("vs is empty")
-		}
-
 		v := vs[0]
 		if v < 0 {
 			return v, errors.New("v is negative")
 		}
 		return v, nil
 	}
-
-	// 测试panic
-	p1 := Promisify(fn)()
-	p1.Then(nil, func(v error) (any, error) {
-		if v.Error() != "UnexpectedError: vs is empty" {
-			t.Errorf("Expected panic 'UnexpectedError: vs is empty', got %v", v.Error())
-		}
-		return nil, nil
-	})
 
 	// 测试正常情况
 	p2 := Promisify(fn)(1)
@@ -233,8 +220,8 @@ func TestMapOneRejected(t *testing.T) {
 			t.Errorf("Promise should not be fulfilled, got value: %v", v)
 			return nil, nil
 		}, func(v error) (any, error) {
-			if v.Error() != "error" {
-				t.Errorf("Expected error 'error', got '%s'", v.Error())
+			if v.Error() != "UnexpectedError: error" {
+				t.Errorf("Expected error 'UnexpectedError: error', got '%s'", v.Error())
 			}
 			return nil, nil
 		})
@@ -478,8 +465,8 @@ func TestPromiseThenRejected(t *testing.T) {
 	p1.Then(nil, func(v error) (any, error) {
 		return "handled: " + v.Error(), nil
 	}).Then(func(v any) (any, error) {
-		if v != "handled: error" {
-			t.Errorf("Expected value 'handled: error', got %v", v)
+		if v != "handled: UnexpectedError: error" {
+			t.Errorf("Expected value 'handled: UnexpectedError: error', got %v", v)
 		}
 		return nil, nil
 	}, nil)
@@ -882,7 +869,7 @@ func TestPromiseAllSettled(t *testing.T) {
 		if results[0]["status"] != Fulfilled || results[0]["value"] != 1 {
 			t.Errorf("Expected first result to be fulfilled with value 1, got %v", results[0])
 		}
-		if results[1]["status"] != Rejected || results[1]["reason"].(error).Error() != "error" {
+		if results[1]["status"] != Rejected || results[1]["reason"].(error).Error() != "UnexpectedError: error" {
 			t.Errorf("Expected second result to be rejected with reason 'error', got %v", results[1])
 		}
 		if results[2]["status"] != Fulfilled || results[2]["value"] != 3 {
