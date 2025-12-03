@@ -32,19 +32,23 @@ func Example_chain() {
 		return nil
 	})
 
-	p.Then(func(v any) (any, error) {
-		fmt.Println(v.(string))
-		return v, nil
-	}, nil).Then(func(v any) (any, error) {
-		fmt.Println(v.(string))
-		return v, nil
-	}, nil).Catch(func(err error) (any, error) {
-		fmt.Println("Nothing happend here.")
-		return nil, nil
-	}).Finally(func() (any, error) {
-		fmt.Println("Finally.")
-		return nil, nil
-	})
+	p.
+		Then(func(v any) (any, error) {
+			fmt.Println(v.(string))
+			return v, nil
+		}, nil).
+		Then(func(v any) (any, error) {
+			fmt.Println(v.(string))
+			return v, nil
+		}, nil).
+		Catch(func(err error) (any, error) {
+			fmt.Println("Nothing happend here.")
+			return nil, nil
+		}).
+		Finally(func() (any, error) {
+			fmt.Println("Finally.")
+			return nil, nil
+		})
 
 	time.Sleep(time.Millisecond * 50)
 

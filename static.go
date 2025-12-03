@@ -99,8 +99,8 @@ func AllSettled(inputs ...any) Promise {
 /*
 Any 等待 inputs 中第一个成功解决的元素。
   - 如果任何一个 Promise 解决，新 Promise 也会被解决，且解决值为第一个被解决的解决值。
-  - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为一个包含所有 Promise 拒绝理由的 map，
-    其顺序为 Promise 数组中的顺序。
+  - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为 AggregateError，
+    其包含所有 Promise 拒绝理由的数组，顺序为 Promise 数组中的顺序。
 */
 func Any(inputs ...any) Promise {
 	if inputs == nil {
@@ -149,11 +149,6 @@ func Async(fn func()) Promise {
 
 	return New(func(resolve, reject func(v any)) error {
 		go func() {
-			defer func() {
-				if err := recover(); err != nil {
-					reject(err)
-				}
-			}()
 			fn()
 			resolve(nil)
 		}()
@@ -338,18 +333,11 @@ func PromiseWithResolvers() (Promise, func(any), func(any)) {
 /*
 Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 Promise 的函数，
 原函数的第二个返回值将被视为 Promise 的拒绝理由。
-
-如果原函数 panic，新 Promise 会被拒绝，拒绝理由为 panic 值。
 */
 func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Promise {
 	return func(args ...A) Promise {
 		return New(func(resolve, reject func(v any)) error {
 			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						reject(r)
-					}
-				}()
 				res, err := fn(args...)
 				if err != nil {
 					reject(err)
@@ -430,7 +418,6 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 				}, nil)
 			return result, nil
 		}, nil)
-
 }
 
 /*
@@ -468,7 +455,7 @@ Some 等待 inputs 中前 num 个元素解决。
   - 如果 num 个元素解决，新 Promise 也会被解决，且解决值为一个包含所有元素解决值的数组，
     其顺序为被解决的顺序。
   - 如果太多元素被拒绝，以至于新 Promise 永远无法满足，那么新 Promise 会立即被拒绝，
-    且拒绝理由为一个包含所有元素拒绝理由的 map，其顺序为被拒绝的顺序。
+    且拒绝理由为 AggregateError，其包含所有元素拒绝理由的数组，顺序为被拒绝的顺序。
 
 注意与 [Any] 的不同，不仅是解决值的格式不同，拒绝理由的顺序也不同。
 */
@@ -517,7 +504,7 @@ func Some(num int, inputs ...any) Promise {
 
 /*
 Try 接受一个任意类型的回调函数（无论其是同步或异步，返回结果或抛出异常），并将其结果封装成一个 Promise，详见 [MDN]。
-  - fn 任意类型的回调函数，接受任意数量的参数，函数返回值格式与 [ThenCallback] 相同。
+  - fn 任意类型的回调函数，接受任意数量的参数，函数返回值格式为 (any, error)。
   - args 将要传递给 fn 函数的参数列表。
 
 返回一个 Promise，其状态可以是：

@@ -81,7 +81,7 @@ func main() {
         p.Then(func(v any) (any, error) {
             println("成功:", v.(string))
             return v, nil
-        }, func(reason any) (any, error) {
+        }, func(reason error) (any, error) {
             println("失败:", reason)
             return nil, nil
         })
@@ -106,17 +106,20 @@ type Promise interface {
     // State 返回 Promise 的当前状态
     State() string
     
-    // Result 返回 Promise 的结果值
-    Result() any
-    
     // Done 返回一个通道，当 Promise 状态变为 Fulfilled 或 Rejected 时，该通道会被关闭
     Done() chan struct{}
+
+    // Value 返回 Promise 的结果值
+    Value() any
+
+    // Reason 返回 Promise 的拒绝原因
+    Reason() error
     
     // Then 方法返回一个新的 Promise，其状态和结果值由回调函数的执行结果决定
-    Then(onFulfilled, onRejected ThenCallback) Promise
+    Then(onFulfilled ThenCallback, onRejected CatchCallback) Promise
     
     // Catch 方法返回一个新的 Promise，是 Then(nil, onRejected) 的语法糖
-    Catch(onRejected ThenCallback) Promise
+    Catch(onRejected CatchCallback) Promise
     
     // Finally 方法返回一个新的 Promise，其状态和结果值与原 Promise 相同
     Finally(onFinally FinallyCallback) Promise
@@ -142,16 +145,16 @@ func Reject(reason any)
 
 ```go
 // All 等待所有 Promise 解决
-func All(proms ...any) Promise
+func All(inputs ...any) Promise
 
 // AllSettled 等待所有 Promise 完成（无论成功失败）
-func AllSettled(proms ...any) Promise
+func AllSettled(inputs ...any) Promise
 
 // Any 等待第一个 Promise 解决
-func Any(proms ...any) Promise
+func Any(inputs ...any) Promise
 
 // Race 等待第一个 Promise 完成
-func Race(proms ...any) Promise
+func Race(inputs ...any) Promise
 ```
 
 ## 典型示例
@@ -176,26 +179,30 @@ p := promise.New(func(resolve, reject func(v any)) (err error) {
     return
 })
 
-p.Then(func(v any) (any, error) {
-    println(v.(string))  // 输出: hello world
-    return v, nil
-}, nil).Then(func(v any) (any, error) {
-    println(v.(string))  // 输出: hello world
-    return v, nil
-}, nil).Catch(func(err any) (any, error) {
-    println("捕获到错误:", err)
-    return nil, nil
-}).Finally(func() (any, error) {
-    println("无论成功失败都会执行")
-    return nil, nil
-})
+p.
+    Then(func(v any) (any, error) {
+        println(v.(string))  // 输出: hello world
+        return v, nil
+    }, nil).
+    Then(func(v any) (any, error) {
+        println(v.(string))  // 输出: hello world
+        return v, nil
+    }, nil).
+    Catch(func(err error) (any, error) {
+        println("捕获到错误:", err)
+        return nil, nil
+    }).
+    Finally(func() (any, error) {
+        println("无论成功失败都会执行")
+        return nil, nil
+    })
 ```
 
 ### 更多示例
 
 更多完整的示例可以参考项目中的示例文件：
-- [基础示例](example/base.go)
-- [进阶示例](example/advance.go)
+- [基础示例](example/base_test.go)
+- [进阶示例](example/advance_test.go)
 
 ## 注意事项
 
@@ -240,17 +247,16 @@ func main() {
 
 #### 超时时间
 
-默认情况下，事件循环的超时时间为512毫秒，并有128毫秒的额外超时保护，即共计640毫秒。如果一个异步任务在640毫秒内未完成，
-或空闲时间超过640毫秒，事件循环会被强制退出。
+默认情况下，事件循环会在空闲一段时间后退出自动退出循环，如果一个异步任务执行时间过长（超过这段空闲时间），将会因事件循环退出而无法正确处理`Promise`。
 
 可以通过以下方式延长：
 
 - 【推荐】获取事件循环操作句柄：将无限延长超时时间（即永不超时），直到手动关闭事件循环。
-- 手动延长超时时间：调用`promise.SetTimeout()`或`promise.SetInterval()`时，将根据设置的延迟时间自动延长超时时间（一次有效，到期将恢复）。
+- 手动延长超时时间：调用`promise.SetTimeout()`或`promise.SetInterval()`时，将根据设置的延迟时间自动延长超时时间（一次有效，到期将恢复默认空闲时间）。
 
 #### 等待 Promise 完成
 
-`<-p.Done()`可以等待`Promise`完成，但需要注意，这会阻塞当前`goroutine`，直到`Promise`完成（有可能永远是`Pending`）。因此应避免使用，
+`<-p.Done()`可以等待`Promise`完成，但需要注意，这将会阻塞当前`goroutine`，直到`Promise`完成（有可能永远是`Pending`）。因此应避免使用，
 而是使用`p.Then()`或`p.Catch()`来处理`Promise`的结果，或调用`promise.Await()`等待`Promise`完成。
 
 ### 错误处理
@@ -262,6 +268,9 @@ func main() {
 #### 类型断言
 
 由于`Go`的类型系统，在处理`Promise`结果时需要进行类型断言。请确保安全地处理断言可能失败的情况。
+
+>   在同一个`promise`的不同分支中，应尽可能`Resolve`同一类型的已决值（尽管`JS`中允许在不同分支`resolve`不同类型的值，这里也使用`any`类型保留了这一特点），
+这样可以保证在后续的`Then`回调中安全地进行类型断言。
 
 ```go
 p.Then(func(v any) (any, error) {

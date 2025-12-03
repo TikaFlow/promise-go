@@ -24,14 +24,17 @@ const (
 )
 
 /*
-ThenCallback 是 Promise 已决时的回调函数（成功或失败）。
-  - 当它作为 onFulfilled 回调函数时，它接收 Promise 的结果值作为参数。
-  - 当它作为 onRejected 回调函数时，它接收 Promise 的拒绝理由作为参数。
+ThenCallback 是 Promise 解决（成功）时的回调函数，它接收 Promise 的结果值作为参数。
 
 当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
 */
 type ThenCallback func(any) (v any, err error)
 
+/*
+CatchCallback 是 Promise 拒绝（失败）时的回调函数，它接收 Promise 的拒绝理由作为参数。
+
+当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
+*/
 type CatchCallback func(error) (v any, err error)
 
 /*
@@ -41,8 +44,6 @@ FinallyCallback 是 Promise 无论成功或失败都要执行的回调函数。
 特别的：
   - 返回值是一个已拒绝的 Promise 实例，将以同样的理由拒绝新 Promise。
   - 执行中报错，将以同样的理由拒绝新 Promise。
-
-当 err 不为 nil 时，后续 Promise 会被拒绝，且拒绝理由为 err。
 */
 type FinallyCallback func() (v any, err error)
 
