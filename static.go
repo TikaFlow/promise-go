@@ -18,7 +18,7 @@ func All(inputs ...any) Promise {
 		return Resolve(make([]any, 0))
 	}
 
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		results := make([]any, len(inputs))
 		var count int32 = 0
 
@@ -52,7 +52,7 @@ func AllSettled(inputs ...any) Promise {
 		return Resolve(make([]map[string]any, 0))
 	}
 
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		type result struct {
 			Status string
 			Value  any
@@ -111,7 +111,7 @@ func Any(inputs ...any) Promise {
 		return Reject(err)
 	}
 
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		length := len(inputs)
 		reasons := make([]error, length)
 
@@ -147,11 +147,11 @@ func Async(fn func()) Promise {
 		return Reject(NewTypeError("fn must be a function"))
 	}
 
-	return New(func(resolve func(v any), reject func(reason error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
-					reject(NewUnexpectedError(err))
+					reject(err)
 				}
 			}()
 			fn()
@@ -249,7 +249,7 @@ Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
   - timeout 延迟时间，单位为毫秒。
 */
 func Delay(prom any, millis int64) Promise {
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		Resolve(prom).Then(func(v2 any) (any, error) {
 			SetTimeout(func() {
 				resolve(v2)
@@ -325,10 +325,9 @@ PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve �
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
 */
-func PromiseWithResolvers() (Promise, func(any), func(error)) {
-	var resolve func(any)
-	var reject func(error)
-	p := New(func(res func(any), rej func(error)) error {
+func PromiseWithResolvers() (Promise, func(any), func(any)) {
+	var resolve, reject func(any)
+	p := New(func(res, rej func(v any)) error {
 		resolve = res
 		reject = rej
 		return nil
@@ -344,11 +343,11 @@ Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 P
 */
 func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Promise {
 	return func(args ...A) Promise {
-		return New(func(resolve func(v any), reject func(r error)) error {
+		return New(func(resolve, reject func(v any)) error {
 			go func() {
 				defer func() {
 					if r := recover(); r != nil {
-						reject(NewUnexpectedError(r))
+						reject(r)
 					}
 				}()
 				res, err := fn(args...)
@@ -372,7 +371,7 @@ func Race(inputs ...any) Promise {
 		return Reject(NewTypeError("nil is not iterable"))
 	}
 
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		if len(inputs) == 0 {
 			return nil
 		}
@@ -439,8 +438,8 @@ Reject 返回一个已拒绝的 Promise，拒绝理由为指定值，详见 [MDN
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 */
-func Reject(reason error) Promise {
-	return New(func(resolve func(v any), reject func(r error)) error {
+func Reject(reason any) Promise {
+	return New(func(resolve, reject func(v any)) error {
 		reject(reason)
 		return nil
 	})
@@ -458,7 +457,7 @@ func Resolve(value any) Promise {
 		return prom
 	}
 
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		resolve(value)
 		return nil
 	})
@@ -488,7 +487,7 @@ func Some(num int, inputs ...any) Promise {
 		return Reject(NewRangeError("no enough promises to resolve"))
 	}
 
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		threshold := len(inputs) - num + 1
 		values := make([]any, 0, num)
 		reasons := make([]error, 0, threshold)
@@ -529,7 +528,7 @@ Try 接受一个任意类型的回调函数（无论其是同步或异步，返�
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/try
 */
 func Try(fn func(...any) (any, error), args ...any) Promise {
-	return New(func(resolve func(v any), reject func(r error)) error {
+	return New(func(resolve, reject func(v any)) error {
 		if fn == nil {
 			return NewTypeError("Promise executor must be a function")
 		}

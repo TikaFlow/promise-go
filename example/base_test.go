@@ -9,9 +9,9 @@ import (
 
 // 基础用法
 func Example_base() {
-	p := promise.New(func(resolve func(v any), reject func(v error)) (err error) {
+	p := promise.New(func(resolve, reject func(v any)) error {
 		resolve("hello world")
-		return
+		return nil
 	})
 
 	p.Then(func(v any) (any, error) {
@@ -27,9 +27,9 @@ func Example_base() {
 
 // 链式调用
 func Example_chain() {
-	p := promise.New(func(resolve func(v any), reject func(v error)) (err error) {
+	p := promise.New(func(resolve, reject func(v any)) error {
 		resolve("hello world")
-		return
+		return nil
 	})
 
 	p.Then(func(v any) (any, error) {
@@ -99,9 +99,9 @@ func Example_asyncAwait() {
 		fmt.Println("Macrotask 1")
 	})
 
-	p := promise.New(func(resolve func(v any), reject func(v error)) (err error) {
+	p := promise.New(func(resolve, reject func(v any)) error {
 		resolve("hello world")
-		return
+		return nil
 	})
 	v, err := promise.Await(p, 1000)
 	if err != nil {

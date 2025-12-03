@@ -122,7 +122,7 @@ func TestReduceRejected(t *testing.T) {
 	reducer := func(acc any, item any) any {
 		return acc.(int) + item.(int)
 	}
-	Reduce(reducer, Resolve(3), Resolve(4), Reject(errors.New("error"))).
+	Reduce(reducer, Resolve(3), Resolve(4), Reject("error")).
 		Then(func(v any) (any, error) {
 			t.Errorf("Promise should not be fulfilled, got value: %v", v)
 			return nil, nil
@@ -167,7 +167,7 @@ func TestFilterAllResolved(t *testing.T) {
 func TestFilterOneRejected(t *testing.T) {
 	t.Parallel()
 	p1 := Resolve(1)
-	p2 := Reject(errors.New("error"))
+	p2 := Reject("error")
 	p3 := 3
 
 	filter := func(item any) bool {
@@ -223,7 +223,7 @@ func TestMapAllResolved(t *testing.T) {
 func TestMapOneRejected(t *testing.T) {
 	t.Parallel()
 	p1 := Resolve(1)
-	p2 := Reject(errors.New("error"))
+	p2 := Reject("error")
 	p3 := 3
 	mapper := func(item any) any {
 		return item.(int) * 2
@@ -272,7 +272,7 @@ func TestEachAllSuccess(t *testing.T) {
 // 测试Each - 中间有一个失败
 func TestEachOneFailure(t *testing.T) {
 	t.Parallel()
-	p2 := Reject(errors.New("error"))
+	p2 := Reject("error")
 
 	Each(func(item any, index int, arrLen int) any {
 		return item.(int) * 2
@@ -293,7 +293,7 @@ func TestEachOneFailure(t *testing.T) {
 // 测试Promise的基本创建和解决
 func TestPromiseBasicResolve(t *testing.T) {
 	t.Parallel()
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
@@ -314,8 +314,8 @@ func TestPromiseBasicResolve(t *testing.T) {
 // 测试Promise的基本创建和拒绝
 func TestPromiseBasicReject(t *testing.T) {
 	t.Parallel()
-	p := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("failure"))
+	p := New(func(resolve, reject func(v any)) error {
+		reject("failure")
 		return nil
 	})
 
@@ -336,7 +336,7 @@ func TestPromiseBasicReject(t *testing.T) {
 func TestPromiseString(t *testing.T) {
 	t.Parallel()
 	SetTimeout(func() {
-		p := New(func(resolve func(any), reject func(error)) error {
+		p := New(func(resolve, reject func(v any)) error {
 			resolve("success")
 			return nil
 		})
@@ -356,7 +356,7 @@ func TestPromiseExecutorError(t *testing.T) {
 	t.Parallel()
 	errorMsg := "executor error"
 
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		return errors.New(errorMsg)
 	})
 
@@ -387,22 +387,22 @@ func TestPromiseNilExecutor(t *testing.T) {
 // 测试执行器中多次调用resolve或reject
 func TestPromiseExecutorMultipleCalls(t *testing.T) {
 	t.Parallel()
-	slowProm := New(func(resolve func(any), reject func(error)) error {
+	slowProm := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("slow")
 		}, 200)
 		return nil
 	})
-	fastProm := New(func(resolve func(any), reject func(error)) error {
+	fastProm := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("fast")
 		}, 100)
 		return nil
 	})
 
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		resolve(slowProm)
-		reject(NewUnexpectedError(fastProm))
+		reject(fastProm)
 		return nil
 	})
 
@@ -422,14 +422,14 @@ func TestPromiseExecutorMultipleCalls(t *testing.T) {
 // 测试执行器在resolve或reject已调用后报错
 func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
 	t.Parallel()
-	delayResolve := New(func(resolve func(any), reject func(error)) error {
+	delayResolve := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("success")
 		}, 100)
 		return nil
 	})
 
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		resolve(delayResolve)
 		return errors.New("executor error after resolve")
 	})
@@ -450,7 +450,7 @@ func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
 // 测试Then方法的基本功能 - 成功回调
 func TestPromiseThenFulfilled(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve(1)
 		return nil
 	})
@@ -470,8 +470,8 @@ func TestPromiseThenFulfilled(t *testing.T) {
 // 测试Then方法的基本功能 - 拒绝回调
 func TestPromiseThenRejected(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	p1 := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
 
@@ -490,7 +490,7 @@ func TestPromiseThenRejected(t *testing.T) {
 // 测试Then方法的穿透 - 成功状态
 func TestPromiseThenPassThroughFulfilled(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve("value")
 		return nil
 	})
@@ -508,8 +508,8 @@ func TestPromiseThenPassThroughFulfilled(t *testing.T) {
 // 测试Then方法的穿透 - 拒绝状态
 func TestPromiseThenPassThroughRejected(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("reason"))
+	p1 := New(func(resolve, reject func(v any)) error {
+		reject("reason")
 		return nil
 	})
 
@@ -526,7 +526,7 @@ func TestPromiseThenPassThroughRejected(t *testing.T) {
 // 测试Then方法回调函数抛出错误
 func TestPromiseThenCallbackError(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve("value")
 		return nil
 	})
@@ -540,7 +540,7 @@ func TestPromiseThenCallbackError(t *testing.T) {
 		return nil, nil
 	})
 
-	p2 := Reject(errors.New("error"))
+	p2 := Reject("error")
 	p2.Then(nil, func(v error) (any, error) {
 		return nil, errors.New("callback error")
 	}).Then(nil, func(v error) (any, error) {
@@ -556,7 +556,7 @@ func TestPromiseThenCallbackError(t *testing.T) {
 // 测试Then方法链式调用
 func TestPromiseThenChaining(t *testing.T) {
 	t.Parallel()
-	New(func(resolve func(any), reject func(error)) error {
+	New(func(resolve, reject func(v any)) error {
 		resolve(1)
 		return nil
 	}).Then(func(v any) (any, error) {
@@ -576,8 +576,8 @@ func TestPromiseThenChaining(t *testing.T) {
 // 测试Catch方法
 func TestPromiseCatch(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	p1 := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
 
@@ -625,7 +625,7 @@ func TestPromiseFinallyFulfilled(t *testing.T) {
 	t.Parallel()
 	finallyCalled := false
 
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
@@ -651,8 +651,8 @@ func TestPromiseFinallyRejected(t *testing.T) {
 	t.Parallel()
 	finallyCalled := false
 
-	p1 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	p1 := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
 
@@ -675,7 +675,7 @@ func TestPromiseFinallyRejected(t *testing.T) {
 // 测试Finally方法抛出错误
 func TestPromiseFinallyError(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
@@ -698,12 +698,12 @@ func TestPromiseFinallyError(t *testing.T) {
 // 测试Finally方法返回被拒绝的Promise
 func TestPromiseFinallyReturnsRejectedPromise(t *testing.T) {
 	t.Parallel()
-	rejectedPromise := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("rejected from finally"))
+	rejectedPromise := New(func(resolve, reject func(v any)) error {
+		reject("rejected from finally")
 		return nil
 	})
 
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
@@ -726,15 +726,15 @@ func TestPromiseFinallyReturnsRejectedPromise(t *testing.T) {
 // 测试All方法 - 所有Promise都成功
 func TestPromiseAllFulfilled(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
+	p2 := New(func(resolve, reject func(v any)) error {
 		resolve(2)
 		return nil
 	})
-	p3 := New(func(resolve func(any), reject func(error)) error {
+	p3 := New(func(resolve, reject func(v any)) error {
 		resolve(3)
 		return nil
 	})
@@ -789,15 +789,15 @@ func TestPromiseAllNotPromise(t *testing.T) {
 // 测试All方法 - 有一个Promise被拒绝
 func TestPromiseAllRejected(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	p2 := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
-	p3 := New(func(resolve func(any), reject func(error)) error {
+	p3 := New(func(resolve, reject func(v any)) error {
 		resolve(3)
 		return nil
 	})
@@ -857,15 +857,15 @@ func TestPromiseAllNilArray(t *testing.T) {
 func TestPromiseAllSettled(t *testing.T) {
 	t.Parallel()
 
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		resolve(1)
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	p2 := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
-	p3 := New(func(resolve func(any), reject func(error)) error {
+	p3 := New(func(resolve, reject func(v any)) error {
 		resolve(3)
 		return nil
 	})
@@ -936,16 +936,16 @@ func TestPromiseAllSettledNilArray(t *testing.T) {
 // 测试Any方法 - 有一个Promise成功
 func TestPromiseAnyFulfilled(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error1"))
+	p1 := New(func(resolve, reject func(v any)) error {
+		reject("error1")
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
+	p2 := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
-	p3 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error2"))
+	p3 := New(func(resolve, reject func(v any)) error {
+		reject("error2")
 		return nil
 	})
 
@@ -965,12 +965,12 @@ func TestPromiseAnyFulfilled(t *testing.T) {
 // 测试Any方法 - 所有Promise都失败
 func TestPromiseAnyAllRejected(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error1"))
+	p1 := New(func(resolve, reject func(v any)) error {
+		reject("error1")
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error2"))
+	p2 := New(func(resolve, reject func(v any)) error {
+		reject("error2")
 		return nil
 	})
 
@@ -1073,7 +1073,7 @@ func TestPromiseSome2in3(t *testing.T) {
 	t.Parallel()
 	p1 := Resolve("success1")
 	p2 := Resolve("success2")
-	p3 := Reject(errors.New("failure"))
+	p3 := Reject("failure")
 
 	Some(2, p1, p2, p3).Then(func(v any) (any, error) {
 		if len(v.([]any)) != 2 {
@@ -1095,8 +1095,8 @@ func TestPromiseSome2in3(t *testing.T) {
 // 测试Some方法 - 3个拒绝2个
 func TestPromiseSome2out3(t *testing.T) {
 	t.Parallel()
-	p1 := Reject(errors.New("failure1"))
-	p2 := Reject(errors.New("failure2"))
+	p1 := Reject("failure1")
+	p2 := Reject("failure2")
 	p3 := Resolve("success")
 
 	Some(2, p1, p2, p3).Then(func(v any) (any, error) {
@@ -1125,13 +1125,13 @@ func TestPromiseSome2out3(t *testing.T) {
 // 测试Race方法 - 第一个完成的是成功的Promise
 func TestPromiseRaceFulfilled(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
-			reject(errors.New("error"))
+			reject("error")
 		}, 100)
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
+	p2 := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("success")
 		}, 50)
@@ -1154,13 +1154,13 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 // 测试Race方法 - 第一个完成的是失败的Promise
 func TestPromiseRaceRejected(t *testing.T) {
 	t.Parallel()
-	p1 := New(func(resolve func(any), reject func(error)) error {
+	p1 := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
-			reject(errors.New("error"))
+			reject("error")
 		}, 50)
 		return nil
 	})
-	p2 := New(func(resolve func(any), reject func(error)) error {
+	p2 := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("success")
 		}, 100)
@@ -1171,8 +1171,8 @@ func TestPromiseRaceRejected(t *testing.T) {
 		t.Errorf("Promise.Race should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v error) (any, error) {
-		if v.Error() != "error" {
-			t.Errorf("Expected value 'error', got %v", v.Error())
+		if v.Error() != "UnexpectedError: error" {
+			t.Errorf("Expected value 'UnexpectedError: error', got %v", v.Error())
 		}
 		return nil, nil
 	})
@@ -1237,7 +1237,7 @@ func TestPromiseResolve(t *testing.T) {
 // 测试Resolve方法 - Promise对象 - fulfilled状态
 func TestPromiseResolvePromise(t *testing.T) {
 	t.Parallel()
-	original := New(func(resolve func(any), reject func(error)) error {
+	original := New(func(resolve, reject func(v any)) error {
 		resolve("original")
 		return nil
 	})
@@ -1264,8 +1264,8 @@ func TestPromiseResolvePromise(t *testing.T) {
 // 测试Resolve方法 - Promise对象 - rejected状态
 func TestPromiseResolvePromiseRejected(t *testing.T) {
 	t.Parallel()
-	original := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	original := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
 
@@ -1291,7 +1291,7 @@ func TestPromiseResolvePromiseRejected(t *testing.T) {
 // 测试Reject方法
 func TestPromiseReject(t *testing.T) {
 	t.Parallel()
-	Reject(errors.New("reason")).Then(func(v any) (any, error) {
+	Reject("reason").Then(func(v any) (any, error) {
 		t.Errorf("Promise.Reject should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v error) (any, error) {
@@ -1375,7 +1375,7 @@ func TestPromiseWithResolvers(t *testing.T) {
 
 	// 测试拒绝情况
 	p2, _, reject2 := PromiseWithResolvers()
-	reject2(errors.New("rejected reason"))
+	reject2("rejected reason")
 
 	p2.Then(func(v any) (any, error) {
 		t.Errorf("Promise should be rejected, but was fulfilled with %v", v)
@@ -1393,7 +1393,7 @@ func TestPromiseWithResolvers(t *testing.T) {
 // 测试循环引用检测
 func TestPromiseCycleDetection(t *testing.T) {
 	t.Parallel()
-	initial := New(func(resolve func(any), reject func(error)) error {
+	initial := New(func(resolve, reject func(v any)) error {
 		resolve("initial")
 		return nil
 	})
@@ -1423,7 +1423,7 @@ func TestPromiseThenable(t *testing.T) {
 
 	SetTimeout(func() {
 		p1, resolveP1, _ := PromiseWithResolvers()
-		p2 := New(func(resolve func(any), reject func(error)) error {
+		p2 := New(func(resolve, reject func(v any)) error {
 			resolve(p1)
 			return nil
 		})
@@ -1463,7 +1463,7 @@ func TestPromiseThenable(t *testing.T) {
 // 测试多个Then调用的顺序
 func TestPromiseMultipleThenOrder(t *testing.T) {
 	t.Parallel()
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		resolve("value")
 		return nil
 	})
@@ -1528,7 +1528,7 @@ func TestSetTimeout(t *testing.T) {
 // 测试SetTimeout函数 - 取消
 func TestSetTimeoutCancel(t *testing.T) {
 	t.Parallel()
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		id := SetTimeout(func() {
 			resolve("timeout value")
 		}, 100)
@@ -1768,7 +1768,7 @@ func TestSetIntervalLongDelay(t *testing.T) {
 
 // 测试Await - 成功
 func TestAwaitSuccess(t *testing.T) {
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
@@ -1784,7 +1784,7 @@ func TestAwaitSuccess(t *testing.T) {
 
 // 测试Await - timeout不是正数
 func TestAwaitTimeoutNotPositive(t *testing.T) {
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
 	})
@@ -1801,7 +1801,7 @@ func TestAwaitTimeoutNotPositive(t *testing.T) {
 
 // 测试Await - 超时
 func TestAwaitTimeout(t *testing.T) {
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("success")
 		}, 100)
@@ -1819,8 +1819,8 @@ func TestAwaitTimeout(t *testing.T) {
 
 // 测试Await - 拒绝的Promise
 func TestAwaitRejectedPromise(t *testing.T) {
-	p := New(func(resolve func(any), reject func(error)) error {
-		reject(errors.New("error"))
+	p := New(func(resolve, reject func(v any)) error {
+		reject("error")
 		return nil
 	})
 
@@ -1828,8 +1828,8 @@ func TestAwaitRejectedPromise(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
-	if err.Error() != "error" {
-		t.Errorf("Expected error 'error', got %s", err)
+	if err.Error() != "UnexpectedError: error" {
+		t.Errorf("Expected error 'UnexpectedError: error', got %s", err)
 	}
 }
 
@@ -1850,7 +1850,7 @@ func TestDelay(t *testing.T) {
 		t.Errorf("Expected '%s', got %s", val, res)
 	}
 
-	p := New(func(resolve func(any), reject func(error)) error {
+	p := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("success")
 		}, 50)
@@ -1861,7 +1861,7 @@ func TestDelay(t *testing.T) {
 		t.Errorf("Expected 'TimeoutError: await timeout', got nil")
 	}
 
-	p2 := New(func(resolve func(any), reject func(error)) error {
+	p2 := New(func(resolve, reject func(v any)) error {
 		SetTimeout(func() {
 			resolve("success")
 		}, 50)
@@ -1886,7 +1886,7 @@ func TestAsyncCallOrderMicro(t *testing.T) {
 			result += "[D]"
 			return nil, nil
 		}, nil)
-		New(func(resolve func(any), reject func(error)) error {
+		New(func(resolve, reject func(v any)) error {
 			result += "[A]"
 			res = resolve
 			return nil
@@ -1972,7 +1972,7 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 		SetTimeout(func() {
 			result += "-[28]"
 
-			Reject(errors.New("error")).Catch(func(v error) (any, error) {
+			Reject("error").Catch(func(v error) (any, error) {
 				result += "-[29]"
 				return nil, nil
 			})
@@ -2051,7 +2051,7 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 			return nil, nil
 		}, nil)
 
-		p3 := New(func(resolve func(any), reject func(error)) error {
+		p3 := New(func(resolve, reject func(v any)) error {
 			result += "-[02]"
 			resolve(4)
 			return nil
@@ -2060,7 +2060,7 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 		p3.Then(func(v any) (any, error) {
 			result += "-[06]"
 
-			Reject(errors.New("error")).Catch(func(v error) (any, error) {
+			Reject("error").Catch(func(v error) (any, error) {
 				result += "-[13]"
 
 				Resolve(nil).Then(func(v any) (any, error) {

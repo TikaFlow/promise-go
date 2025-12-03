@@ -77,7 +77,7 @@ func New(exec Executor) Promise {
 			resolvePromise(prom, data)
 		})
 	}
-	rej := func(reason error) {
+	rej := func(reason any) {
 		prom.resolved.Do(func() {
 			rejectPromsie(prom, reason)
 		})

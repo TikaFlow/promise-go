@@ -56,10 +56,10 @@ func resolvePromise(prom *promiseImpl, value any) {
 	flushHandlers(prom)
 }
 
-func rejectPromsie(prom *promiseImpl, reason error) {
+func rejectPromsie(prom *promiseImpl, r any) {
 	if getGoroutineID() != eventLoopID {
 		SetTimeout(func() {
-			rejectPromsie(prom, reason)
+			rejectPromsie(prom, r)
 		}, 0)
 		return
 	}
@@ -70,6 +70,11 @@ func rejectPromsie(prom *promiseImpl, reason error) {
 
 	if prom.State() != Pending {
 		return
+	}
+
+	reason, ok := r.(error)
+	if !ok {
+		reason = NewUnexpectedError(r)
 	}
 
 	prom.dataLock.Lock()

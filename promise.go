@@ -69,7 +69,7 @@ func (prom *promiseImpl) Reason() error {
 [Promise.Then]
 */
 func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected CatchCallback) Promise {
-	prom2 := New(func(resolve func(v any), reject func(r error)) error {
+	prom2 := New(func(resolve, reject func(v any)) error {
 		return nil
 	})
 	callHooks(PromiseChained, prom)

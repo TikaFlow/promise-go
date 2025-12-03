@@ -53,7 +53,7 @@ Executor 是 Promise 构造函数的执行器。
 
 如果执行器函数返回一个非 nil 值 err，则 Promise 会被拒绝，且拒绝理由为 err。
 */
-type Executor func(resolve func(v any), reject func(r error)) (err error)
+type Executor func(resolve, reject func(v any)) (err error)
 
 /*
 Promise 是一个拥有 then 方法的对象，其行为符合 Promises/A+ 规范。
