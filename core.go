@@ -108,18 +108,21 @@ type EventLoop interface {
 	All(inputs ...any) Promise
 	AllSettled(inputs ...any) Promise
 	Any(inputs ...any) Promise
-	Await(prom any, timeout int64) (v any, err error)
 	Async(fn func()) Promise
+	Await(prom any, timeout int64) (v any, err error)
 	Delay(prom any, millis int64) Promise
 	Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise
 	Filter(filter func(item any) bool, inputs ...any) Promise
 	Map(mapper func(item any) any, inputs ...any) Promise
+	On(event HookType, hook func(p Promise)) string
+	Off(event HookType, key string)
 	PromiseWithResolvers() (Promise, func(any), func(any))
+	Promisify(fn func(args ...any) (any, error)) func(args ...any) Promise
 	QueueMicrotask(fn func())
 	Race(inputs ...any) Promise
 	Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise
-	Resolve(input any) Promise
 	Reject(reason any) Promise
+	Resolve(input any) Promise
 	Some(num int, inputs ...any) Promise
 	Try(fn func(...any) (any, error), args ...any) Promise
 }

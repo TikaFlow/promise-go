@@ -75,37 +75,37 @@ On 注册一个 Promise 钩子函数。
 
 返回值：注册成功返回钩子函数的唯一标识，可用于后续移除钩子函数，失败返回空字符串。
 */
-func (hk *promiseHooks) On(event HookType, hook func(p Promise)) string {
+func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 	if hook == nil {
 		return ""
 	}
 
-	hk.hooksLock.Lock()
-	defer hk.hooksLock.Unlock()
+	el.hooks.hooksLock.Lock()
+	defer el.hooks.hooksLock.Unlock()
 
 	var exist = true
 	var key string
 	for exist {
 		key = string(event) + randString(16)
-		_, exist = hk.hooks[key]
+		_, exist = el.hooks.hooks[key]
 	}
 
 	switch event {
 	case PromiseCreated:
-		hk.createdHookKeys = append(hk.createdHookKeys, key)
-		hk.hooks[key] = hook
+		el.hooks.createdHookKeys = append(el.hooks.createdHookKeys, key)
+		el.hooks.hooks[key] = hook
 	case PromiseChained:
-		hk.chainedHookKeys = append(hk.chainedHookKeys, key)
-		hk.hooks[key] = hook
+		el.hooks.chainedHookKeys = append(el.hooks.chainedHookKeys, key)
+		el.hooks.hooks[key] = hook
 	case PromiseFulfilled:
-		hk.fulfilledHookKeys = append(hk.fulfilledHookKeys, key)
-		hk.hooks[key] = hook
+		el.hooks.fulfilledHookKeys = append(el.hooks.fulfilledHookKeys, key)
+		el.hooks.hooks[key] = hook
 	case PromiseRejected:
-		hk.rejectedHookKeys = append(hk.rejectedHookKeys, key)
-		hk.hooks[key] = hook
+		el.hooks.rejectedHookKeys = append(el.hooks.rejectedHookKeys, key)
+		el.hooks.hooks[key] = hook
 	case PromiseSettled:
-		hk.settledHookKeys = append(hk.settledHookKeys, key)
-		hk.hooks[key] = hook
+		el.hooks.settledHookKeys = append(el.hooks.settledHookKeys, key)
+		el.hooks.hooks[key] = hook
 	}
 
 	return key
@@ -116,31 +116,31 @@ Off 移除一个 Promise 钩子函数。
   - event: 钩子事件类型，可选值为 [PromiseCreated]/[PromiseChained]/[PromiseFulfilled]/[PromiseRejected]/[PromiseSettled]。
   - key: 要移除的钩子函数的唯一标识，由 On 方法返回。
 */
-func (hk *promiseHooks) Off(event HookType, key string) {
+func (el *eventLoopImpl) Off(event HookType, key string) {
 	if key == "" {
 		return
 	}
 
-	hk.hooksLock.Lock()
-	defer hk.hooksLock.Unlock()
+	el.hooks.hooksLock.Lock()
+	defer el.hooks.hooksLock.Unlock()
 
 	var targetSlice *[]string
 
 	switch event {
 	case PromiseCreated:
-		targetSlice = &hk.createdHookKeys
+		targetSlice = &el.hooks.createdHookKeys
 	case PromiseChained:
-		targetSlice = &hk.chainedHookKeys
+		targetSlice = &el.hooks.chainedHookKeys
 	case PromiseFulfilled:
-		targetSlice = &hk.fulfilledHookKeys
+		targetSlice = &el.hooks.fulfilledHookKeys
 	case PromiseRejected:
-		targetSlice = &hk.rejectedHookKeys
+		targetSlice = &el.hooks.rejectedHookKeys
 	case PromiseSettled:
-		targetSlice = &hk.settledHookKeys
+		targetSlice = &el.hooks.settledHookKeys
 	}
 
 	if targetSlice != nil && deleteFromSlice(targetSlice, key) {
-		delete(hk.hooks, key)
+		delete(el.hooks.hooks, key)
 	}
 }
 
