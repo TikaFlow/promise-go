@@ -14,7 +14,6 @@ var (
 	taskQuene      chan func()     = make(chan func(), 1024*10)
 	tasks          []*timerTask    = make([]*timerTask, 0, 1024*10)
 	schedulerTimer *time.Timer     = time.NewTimer(magic)
-	curTimeout     time.Duration   = magic
 	taskCh         chan *timerTask = make(chan *timerTask, 1024)
 	clearCh        chan int        = make(chan int, 1024)
 	schedulerDone  chan struct{}   = make(chan struct{})
@@ -41,7 +40,7 @@ func resetSchedulerTimer(t time.Duration) {
 		default:
 		}
 	}
-	curTimeout = t
+
 	schedulerTimer.Reset(t)
 }
 
@@ -193,10 +192,6 @@ func timerScheduler() {
 		case id := <-clearCh:
 			removeTask(id)
 		case <-schedulerTimer.C:
-			if curTimeout == magic {
-				resetSchedulerTimer(magic)
-				continue
-			}
 			comsumeTask()
 		case <-schedulerDone:
 			return
