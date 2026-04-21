@@ -2,7 +2,6 @@ package promise
 
 import "fmt"
 
-// TypeError
 type TypeError struct {
 	text string
 }
@@ -15,7 +14,6 @@ func NewTypeError(text string) *TypeError {
 	return &TypeError{text}
 }
 
-// RangeError
 type RangeError struct {
 	text string
 }
@@ -28,7 +26,6 @@ func NewRangeError(text string) *RangeError {
 	return &RangeError{text}
 }
 
-// NewTimeoutError
 type TimeoutError struct {
 	text string
 }
@@ -41,7 +38,6 @@ func NewTimeoutError(text string) *TimeoutError {
 	return &TimeoutError{text}
 }
 
-// AggregateError
 type AggregateError struct {
 	errors  []error
 	stack   string
@@ -64,7 +60,6 @@ func NewAggregateError(errors []error, stack string, message string) *AggregateE
 	}
 }
 
-// UnexpectedError
 type UnexpectedError struct {
 	reason any
 }

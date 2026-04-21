@@ -9,7 +9,7 @@ import (
 
 // 基础用法
 func Example_base() {
-	p := promise.New(func(resolve, reject func(v any)) error {
+	p := promise.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
 	})
@@ -27,7 +27,7 @@ func Example_base() {
 
 // 链式调用
 func Example_chain() {
-	p := promise.New(func(resolve, reject func(v any)) error {
+	p := promise.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
 	})
@@ -103,7 +103,7 @@ func Example_asyncAwait() {
 		fmt.Println("Macrotask 1")
 	})
 
-	p := promise.New(func(resolve, reject func(v any)) error {
+	p := promise.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
 	})

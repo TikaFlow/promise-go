@@ -5,68 +5,66 @@ import (
 	"sync"
 )
 
-type PromiseHookType string
+type HookType string
 
 const (
 	/*
 		PromiseCreated 当 Promise 实例被创建时调用。
 	*/
-	PromiseCreated PromiseHookType = "created"
+	PromiseCreated HookType = "created"
 
 	/*
 		PromiseChained 当 Promise 实例被链式调用时调用。
 	*/
-	PromiseChained PromiseHookType = "chained"
+	PromiseChained HookType = "chained"
 
 	/*
 		PromiseFulfilled 当 Promise 实例被成功解决时调用。
 	*/
-	PromiseFulfilled PromiseHookType = "fulfilled"
+	PromiseFulfilled HookType = "fulfilled"
 
 	/*
 		PromiseRejected 当 Promise 实例被拒绝时调用。
 	*/
-	PromiseRejected PromiseHookType = "rejected"
+	PromiseRejected HookType = "rejected"
 
 	/*
 		PromiseSettled 当 Promise 实例被解决（无论成功或拒绝）时调用。
 	*/
-	PromiseSettled PromiseHookType = "settled"
+	PromiseSettled HookType = "settled"
 )
 
-var (
-	createdHoookKeys   []string = make([]string, 0, 64)
-	chainedHoookKeys   []string = make([]string, 0, 64)
-	fulfilledHoookKeys []string = make([]string, 0, 64)
-	rejectedHoookKeys  []string = make([]string, 0, 64)
-	settledHoookKeys   []string = make([]string, 0, 64)
+type promiseHooks struct {
+	createdHookKeys   []string
+	chainedHookKeys   []string
+	fulfilledHookKeys []string
+	rejectedHookKeys  []string
+	settledHookKeys   []string
+	hooks             map[string]func(p Promise)
+	hooksLock         sync.RWMutex
+}
 
-	hooks map[string]func(p Promise) = make(map[string]func(p Promise), 512)
-
-	hooksLock sync.RWMutex
-)
-
-func callHook(slice []string, p Promise) {
+func (hk *promiseHooks) callHook(slice []string, p Promise) {
 	for _, key := range slice {
-		hooks[key](p)
+		hk.hooks[key](p)
 	}
 }
 
-func callHooks(event PromiseHookType, p Promise) {
-	hooksLock.RLock()
-	defer hooksLock.RUnlock()
+func (hk *promiseHooks) callHooks(event HookType, p Promise) {
+	hk.hooksLock.RLock()
+	defer hk.hooksLock.RUnlock()
 
 	switch event {
 	case PromiseCreated:
-		callHook(createdHoookKeys, p)
+		hk.callHook(hk.createdHookKeys, p)
 	case PromiseChained:
-		callHook(chainedHoookKeys, p)
+		hk.callHook(hk.chainedHookKeys, p)
 	case PromiseFulfilled:
-		callHook(fulfilledHoookKeys, p)
+		hk.callHook(hk.fulfilledHookKeys, p)
 	case PromiseRejected:
-		callHook(rejectedHoookKeys, p)
+		hk.callHook(hk.rejectedHookKeys, p)
 	case PromiseSettled:
-		callHook(settledHoookKeys, p)
+		hk.callHook(hk.settledHookKeys, p)
 	}
 }
 
@@ -77,37 +75,37 @@ On 注册一个 Promise 钩子函数。
 
 返回值：注册成功返回钩子函数的唯一标识，可用于后续移除钩子函数，失败返回空字符串。
 */
-func On(event PromiseHookType, hook func(p Promise)) string {
+func (hk *promiseHooks) On(event HookType, hook func(p Promise)) string {
 	if hook == nil {
 		return ""
 	}
 
-	hooksLock.Lock()
-	defer hooksLock.Unlock()
+	hk.hooksLock.Lock()
+	defer hk.hooksLock.Unlock()
 
 	var exist = true
 	var key string
 	for exist {
-		key = string(event) + randString(13)
-		_, exist = hooks[key]
+		key = string(event) + randString(16)
+		_, exist = hk.hooks[key]
 	}
 
 	switch event {
 	case PromiseCreated:
-		createdHoookKeys = append(createdHoookKeys, key)
-		hooks[key] = hook
+		hk.createdHookKeys = append(hk.createdHookKeys, key)
+		hk.hooks[key] = hook
 	case PromiseChained:
-		chainedHoookKeys = append(chainedHoookKeys, key)
-		hooks[key] = hook
+		hk.chainedHookKeys = append(hk.chainedHookKeys, key)
+		hk.hooks[key] = hook
 	case PromiseFulfilled:
-		fulfilledHoookKeys = append(fulfilledHoookKeys, key)
-		hooks[key] = hook
+		hk.fulfilledHookKeys = append(hk.fulfilledHookKeys, key)
+		hk.hooks[key] = hook
 	case PromiseRejected:
-		rejectedHoookKeys = append(rejectedHoookKeys, key)
-		hooks[key] = hook
+		hk.rejectedHookKeys = append(hk.rejectedHookKeys, key)
+		hk.hooks[key] = hook
 	case PromiseSettled:
-		settledHoookKeys = append(settledHoookKeys, key)
-		hooks[key] = hook
+		hk.settledHookKeys = append(hk.settledHookKeys, key)
+		hk.hooks[key] = hook
 	}
 
 	return key
@@ -118,31 +116,31 @@ Off 移除一个 Promise 钩子函数。
   - event: 钩子事件类型，可选值为 [PromiseCreated]/[PromiseChained]/[PromiseFulfilled]/[PromiseRejected]/[PromiseSettled]。
   - key: 要移除的钩子函数的唯一标识，由 On 方法返回。
 */
-func Off(event PromiseHookType, key string) {
+func (hk *promiseHooks) Off(event HookType, key string) {
 	if key == "" {
 		return
 	}
 
-	hooksLock.Lock()
-	defer hooksLock.Unlock()
+	hk.hooksLock.Lock()
+	defer hk.hooksLock.Unlock()
 
 	var targetSlice *[]string
 
 	switch event {
 	case PromiseCreated:
-		targetSlice = &createdHoookKeys
+		targetSlice = &hk.createdHookKeys
 	case PromiseChained:
-		targetSlice = &chainedHoookKeys
+		targetSlice = &hk.chainedHookKeys
 	case PromiseFulfilled:
-		targetSlice = &fulfilledHoookKeys
+		targetSlice = &hk.fulfilledHookKeys
 	case PromiseRejected:
-		targetSlice = &rejectedHoookKeys
+		targetSlice = &hk.rejectedHookKeys
 	case PromiseSettled:
-		targetSlice = &settledHoookKeys
+		targetSlice = &hk.settledHookKeys
 	}
 
 	if targetSlice != nil && deleteFromSlice(targetSlice, key) {
-		delete(hooks, key)
+		delete(hk.hooks, key)
 	}
 }
 

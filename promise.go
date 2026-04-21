@@ -12,9 +12,7 @@ type handler struct {
 	onFulfilled ThenCallback
 	onRejected  CatchCallback
 
-	/*
-	   即将返回的 Promise 实例（新）
-	*/
+	// 即将返回的 Promise 实例（新）
 	prom *promiseImpl
 }
 
@@ -29,11 +27,11 @@ type promiseImpl struct {
 	settledHandlers chan *handler
 	settled         chan struct{}
 	resolved        sync.Once
+	// 所属的事件循环
+	eventLoop *eventLoopImpl
 }
 
-/*
-[Promise.State]
-*/
+// State [Promise.State]
 func (prom *promiseImpl) State() string {
 	prom.dataLock.RLock()
 	defer prom.dataLock.RUnlock()
@@ -69,10 +67,10 @@ func (prom *promiseImpl) Reason() error {
 [Promise.Then]
 */
 func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected CatchCallback) Promise {
-	prom2 := New(func(resolve, reject func(v any)) error {
+	prom2 := prom.eventLoop.NewPromise(func(resolve, reject func(v any)) error {
 		return nil
 	})
-	callHooks(PromiseChained, prom)
+	prom.eventLoop.hooks.callHooks(PromiseChained, prom)
 	prom.settledHandlers <- &handler{
 		onFulfilled: onFulfilled,
 		onRejected:  onRejected,

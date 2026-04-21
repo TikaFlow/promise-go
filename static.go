@@ -10,20 +10,20 @@ All 等待所有输入解决。
   - 如果 inputs 的所有元素都成功解决，新 Promise 也会成功解决，且解决值为一个包含所有元素解决值的数组；
   - 如果任何一个元素被拒绝，新 Promise 也会被拒绝，且拒绝理由为第一个被拒绝的元素的拒绝理由。
 */
-func All(inputs ...any) Promise {
+func (el *eventLoopImpl) All(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
-		return Resolve(make([]any, 0))
+		return el.Resolve(make([]any, 0))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		results := make([]any, len(inputs))
 		var count int32 = 0
 
 		for index, item := range inputs {
-			prom := Resolve(item)
+			prom := el.Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				results[index] = v
 				if newCount := atomic.AddInt32(&count, 1); int(newCount) == len(inputs) {
@@ -44,15 +44,15 @@ func All(inputs ...any) Promise {
 AllSettled 等待所有 Promise 完成（无论成功失败）。
   - 新 Promise 会在所有 Promise 完成后解决，解决值为一个包含所有 Promise 完成状态和结果的数组。
 */
-func AllSettled(inputs ...any) Promise {
+func (el *eventLoopImpl) AllSettled(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
-		return Resolve(make([]map[string]any, 0))
+		return el.Resolve(make([]map[string]any, 0))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		type result struct {
 			Status string
 			Value  any
@@ -63,7 +63,7 @@ func AllSettled(inputs ...any) Promise {
 		results := make([]result, length)
 		var count int32 = 0
 		for index, item := range inputs {
-			prom := Resolve(item)
+			prom := el.Resolve(item)
 			settleData := func() {
 				finalResults := make([]map[string]any, length)
 				for i, r := range results {
@@ -102,23 +102,23 @@ Any 等待 inputs 中第一个成功解决的元素。
   - 如果所有 Promise 都被拒绝，新 Promise 也会被拒绝，且拒绝理由为 AggregateError，
     其包含所有 Promise 拒绝理由的数组，顺序为 Promise 数组中的顺序。
 */
-func Any(inputs ...any) Promise {
+func (el *eventLoopImpl) Any(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
 		err := NewAggregateError(make([]error, 0), "All promises were rejected", "All promises were rejected")
-		return Reject(err)
+		return el.Reject(err)
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		length := len(inputs)
 		reasons := make([]error, length)
 
 		var count int32 = 0
 
 		for index, item := range inputs {
-			prom := Resolve(item)
+			prom := el.Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				resolve(v)
 				return nil, nil
@@ -142,12 +142,12 @@ Async 将代码作为一个异步任务执行。
 返回一个 Promise 实例，并在 fn 函数执行完成后变为已决状态，
 若 fn 函数抛出异常，则 Promise 实例会被拒绝，且拒绝理由为异常信息。
 */
-func Async(fn func()) Promise {
+func (el *eventLoopImpl) Async(fn func()) Promise {
 	if fn == nil {
-		return Reject(NewTypeError("fn must be a function"))
+		return el.Reject(NewTypeError("fn must be a function"))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		go func() {
 			fn()
 			resolve(nil)
@@ -164,7 +164,7 @@ Await 等待 Promise 完成，并设定超时时间，以免无限等待。
 
 返回值：v 是已决值，err 是拒绝理由，当 err 存在时，代表 Promise 被拒绝。
 */
-func Await(prom any, timeout int64) (v any, err error) {
+func (el *eventLoopImpl) Await(prom any, timeout int64) (v any, err error) {
 	if timeout <= 0 {
 		return nil, NewRangeError("await timeout must be greater than 0")
 	}
@@ -205,18 +205,18 @@ Each 按顺序等待数组中的每个元素完成，每个元素的完成结果
   - 已解决（Fulfilled）：如果所有迭代都成功解决，已决值是包含原始输入已决值的数组。
   - 已拒绝（Rejected）：如果迭代过程中任何一个 Promise 被拒绝。
 */
-func Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
+func (el *eventLoopImpl) Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
-		return Resolve(make([]any, 0))
+		return el.Resolve(make([]any, 0))
 	}
 	if it == nil {
-		return Reject(NewTypeError("nil is not a function"))
+		return el.Reject(NewTypeError("nil is not a function"))
 	}
 
-	prom := Resolve("start")
+	prom := el.Resolve("start")
 	arrLen := len(inputs)
 	result := make([]any, arrLen)
 	for index, item := range inputs {
@@ -243,10 +243,10 @@ Delay 返回一个新的 Promise，其状态会在延迟时间后被解决。
     如果是一个已拒绝的 Promise，则会立即拒绝新 Promise。
   - timeout 延迟时间，单位为毫秒。
 */
-func Delay(prom any, millis int64) Promise {
-	return New(func(resolve, reject func(v any)) error {
-		Resolve(prom).Then(func(v2 any) (any, error) {
-			SetTimeout(func() {
+func (el *eventLoopImpl) Delay(prom any, millis int64) Promise {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
+		el.Resolve(prom).Then(func(v2 any) (any, error) {
+			el.SetTimeout(func() {
 				resolve(v2)
 			}, millis)
 			return nil, nil
@@ -265,9 +265,9 @@ Filter 过滤数组中的元素，返回一个新的 Promise，其状态可以�
 
 本质上是 Map + Array.Filter 的快捷方式。
 */
-func Filter(filter func(item any) bool, inputs ...any) Promise {
-	return Map(func(item any) any {
-		return All(item, filter(item))
+func (el *eventLoopImpl) Filter(filter func(item any) bool, inputs ...any) Promise {
+	return el.Map(func(item any) any {
+		return el.All(item, filter(item))
 	}, inputs...).
 		Then(func(v any) (any, error) {
 			values := v.([]any)
@@ -291,25 +291,25 @@ Map 对输入数组中的每个元素应用一个函数，返回一个新的 Pro
   - 已解决（Fulfilled）：如果所有 Promise 都成功解决，且每个 Promise 的解决值都被 mapper 处理后得到新值。
   - 已拒绝（Rejected）：如果任何一个 Promise 被拒绝。
 */
-func Map(mapper func(item any) any, inputs ...any) Promise {
+func (el *eventLoopImpl) Map(mapper func(item any) any, inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 	if len(inputs) == 0 {
-		return Resolve(make([]any, 0))
+		return el.Resolve(make([]any, 0))
 	}
 	if mapper == nil {
-		return Reject(NewTypeError("nil is not a function"))
+		return el.Reject(NewTypeError("nil is not a function"))
 	}
 
 	result := make([]any, len(inputs))
 	for index, item := range inputs {
-		result[index] = Resolve(item).Then(func(v any) (any, error) {
+		result[index] = el.Resolve(item).Then(func(v any) (any, error) {
 			return mapper(v), nil
 		}, nil)
 	}
 
-	return All(result...)
+	return el.All(result...)
 }
 
 /*
@@ -320,9 +320,9 @@ PromiseWithResolvers 创建一个新的 Promise 实例，同时返回 resolve �
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
 */
-func PromiseWithResolvers() (Promise, func(any), func(any)) {
+func (el *eventLoopImpl) PromiseWithResolvers() (Promise, func(any), func(any)) {
 	var resolve, reject func(any)
-	p := New(func(res, rej func(v any)) error {
+	p := el.NewPromise(func(res, rej func(v any)) error {
 		resolve = res
 		reject = rej
 		return nil
@@ -334,9 +334,9 @@ func PromiseWithResolvers() (Promise, func(any), func(any)) {
 Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 Promise 的函数，
 原函数的第二个返回值将被视为 Promise 的拒绝理由。
 */
-func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Promise {
-	return func(args ...A) Promise {
-		return New(func(resolve, reject func(v any)) error {
+func (el *eventLoopImpl) Promisify(fn func(args ...any) (any, error)) func(args ...any) Promise {
+	return func(args ...any) Promise {
+		return el.NewPromise(func(resolve, reject func(v any)) error {
 			go func() {
 				res, err := fn(args...)
 				if err != nil {
@@ -354,18 +354,18 @@ func Promisify[A any, V any](fn func(args ...A) (V, error)) func(args ...A) Prom
 Race 等待第一个 Promise 完成。
   - 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由跟随第一个完成的 Promise。
 */
-func Race(inputs ...any) Promise {
+func (el *eventLoopImpl) Race(inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		if len(inputs) == 0 {
 			return nil
 		}
 
 		for _, item := range inputs {
-			prom := Resolve(item)
+			prom := el.Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				resolve(v)
 				return nil, nil
@@ -395,8 +395,8 @@ Reduce 对数组中的每个元素应用一个函数，将其结果累积到一�
   - 如果 inputs 为空数组，直接返回初始 initial；
   - 如果 initial 为 nil，且 inputs 只有一个元素，直接返回该元素。
 */
-func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise {
-	init := Resolve(initial)
+func (el *eventLoopImpl) Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise {
+	init := el.Resolve(initial)
 
 	if len(inputs) == 0 {
 		return init
@@ -409,7 +409,7 @@ func Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Prom
 			}
 
 			acc := v
-			result := Each(func(item any, index int, arrLen int) any {
+			result := el.Each(func(item any, index int, arrLen int) any {
 				acc = reducer(acc, item)
 				return nil
 			}, inputs...).
@@ -425,8 +425,8 @@ Reject 返回一个已拒绝的 Promise，拒绝理由为指定值，详见 [MDN
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 */
-func Reject(reason any) Promise {
-	return New(func(resolve, reject func(v any)) error {
+func (el *eventLoopImpl) Reject(reason any) Promise {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		reject(reason)
 		return nil
 	})
@@ -439,12 +439,12 @@ Resolve 返回一个已解决的 Promise，解决值为指定值 value。
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/resolve
 */
-func Resolve(value any) Promise {
+func (el *eventLoopImpl) Resolve(value any) Promise {
 	if prom, ok := value.(Promise); ok {
 		return prom
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve(value)
 		return nil
 	})
@@ -459,22 +459,22 @@ Some 等待 inputs 中前 num 个元素解决。
 
 注意与 [Any] 的不同，不仅是解决值的格式不同，拒绝理由的顺序也不同。
 */
-func Some(num int, inputs ...any) Promise {
+func (el *eventLoopImpl) Some(num int, inputs ...any) Promise {
 	if inputs == nil {
-		return Reject(NewTypeError("nil is not iterable"))
+		return el.Reject(NewTypeError("nil is not iterable"))
 	}
 	if num <= 0 {
-		return Reject(NewRangeError("num must be greater than 0"))
+		return el.Reject(NewRangeError("num must be greater than 0"))
 	}
 	if len(inputs) == 0 {
 		err := NewAggregateError(make([]error, 0), "All promises were rejected", "All promises were rejected")
-		return Reject(err)
+		return el.Reject(err)
 	}
 	if num > len(inputs) {
-		return Reject(NewRangeError("no enough promises to resolve"))
+		return el.Reject(NewRangeError("no enough promises to resolve"))
 	}
 
-	return New(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		threshold := len(inputs) - num + 1
 		values := make([]any, 0, num)
 		reasons := make([]error, 0, threshold)
@@ -482,7 +482,7 @@ func Some(num int, inputs ...any) Promise {
 		var rejCount int32 = 0
 
 		for _, item := range inputs {
-			prom := Resolve(item)
+			prom := el.Resolve(item)
 			prom.Then(func(v any) (any, error) {
 				values = append(values, v)
 				if newCount := atomic.AddInt32(&resCount, 1); int(newCount) == num {
@@ -514,8 +514,8 @@ Try 接受一个任意类型的回调函数（无论其是同步或异步，返�
 
 [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/try
 */
-func Try(fn func(...any) (any, error), args ...any) Promise {
-	return New(func(resolve, reject func(v any)) error {
+func (el *eventLoopImpl) Try(fn func(...any) (any, error), args ...any) Promise {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
 		if fn == nil {
 			return NewTypeError("Promise executor must be a function")
 		}
