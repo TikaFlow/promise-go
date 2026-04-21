@@ -1,41 +1,37 @@
-# 编译输出
+# .gitignore file template for Go project
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.gitignore
+#
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-*.test
-*.out
 
-# IDE 和编辑器文件
+# Test binary, built with `go test -c`
+*.test
+
+# Code coverage profiles and other test artifacts
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+
+# Editor/IDE
 .idea/
 .vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# 模块和依赖
-vendor/
-go.sum
-
-# 环境变量文件
-.env
-.env.local
-.env.*.local
-
-# 日志文件
-*.log
-
-# 构建缓存
-.cache/
-build/
-
-# 临时文件
-*.tmp
-*.temp
-.tmp/
-.temp/
-
-# 额外排除
-promise_aplus.md
+.trae/
+.trae-data/
