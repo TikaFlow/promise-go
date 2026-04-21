@@ -117,7 +117,6 @@ type EventLoop interface {
 	On(event HookType, hook func(p Promise)) string
 	Off(event HookType, key string)
 	PromiseWithResolvers() (Promise, func(any), func(any))
-	Promisify(fn func(args ...any) (any, error)) func(args ...any) Promise
 	QueueMicrotask(fn func())
 	Race(inputs ...any) Promise
 	Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise

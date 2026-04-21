@@ -331,26 +331,6 @@ func (el *eventLoopImpl) PromiseWithResolvers() (Promise, func(any), func(any)) 
 }
 
 /*
-Promisify 将一个返回值格式为 (result, error) 的函数转换为返回 Promise 的函数，
-原函数的第二个返回值将被视为 Promise 的拒绝理由。
-*/
-func (el *eventLoopImpl) Promisify(fn func(args ...any) (any, error)) func(args ...any) Promise {
-	return func(args ...any) Promise {
-		return el.NewPromise(func(resolve, reject func(v any)) error {
-			go func() {
-				res, err := fn(args...)
-				if err != nil {
-					reject(err)
-				} else {
-					resolve(res)
-				}
-			}()
-			return nil
-		})
-	}
-}
-
-/*
 Race 等待第一个 Promise 完成。
   - 新 Promise 会在第一个 Promise 完成后解决或拒绝，解决值或拒绝理由跟随第一个完成的 Promise。
 */
