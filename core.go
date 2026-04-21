@@ -104,6 +104,24 @@ type EventLoop interface {
 	SetInterval(callback func(), millis int64) int
 	ClearTimeout(id int)
 	ClearInterval(id int)
+	NewPromise(exec Executor) Promise
+	All(inputs ...any) Promise
+	AllSettled(inputs ...any) Promise
+	Any(inputs ...any) Promise
+	Await(prom any, timeout int64) (v any, err error)
+	Async(fn func()) Promise
+	Delay(prom any, millis int64) Promise
+	Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise
+	Filter(filter func(item any) bool, inputs ...any) Promise
+	Map(mapper func(item any) any, inputs ...any) Promise
+	PromiseWithResolvers() (Promise, func(any), func(any))
+	QueueMicrotask(fn func())
+	Race(inputs ...any) Promise
+	Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise
+	Resolve(input any) Promise
+	Reject(reason any) Promise
+	Some(num int, inputs ...any) Promise
+	Try(fn func(...any) (any, error), args ...any) Promise
 }
 
 type eventLoopImpl struct {
