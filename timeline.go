@@ -1,7 +1,7 @@
 package promise
 
 import (
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -10,7 +10,8 @@ const (
 )
 
 type timeLine struct {
-	nextID    atomic.Int64
+	nextID    int
+	idLock    sync.Mutex
 	tasks     []*timedTask
 	timer     *time.Timer
 	taskCh    chan *timedTask
@@ -93,7 +94,11 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 		millis = minDelay
 	}
 
-	id := int(tl.nextID.Add(1))
+	tl.idLock.Lock()
+	defer tl.idLock.Unlock()
+
+	tl.nextID++
+	id := tl.nextID
 	task := &timedTask{
 		id:       id,
 		deadline: time.Now().Add(time.Duration(millis) * time.Millisecond),
@@ -105,7 +110,7 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 	return id
 }
 
-func (tl *timeLine) comsumeTask() {
+func (tl *timeLine) consumeTask() {
 	if len(tl.tasks) > 0 && !tl.tasks[0].deadline.After(time.Now()) {
 		task := tl.tasks[0]
 		tl.tasks = tl.tasks[1:]
@@ -169,7 +174,7 @@ func (tl *timeLine) run() {
 		case id := <-tl.clearCh:
 			tl.removeTask(id)
 		case <-tl.timer.C:
-			tl.comsumeTask()
+			tl.consumeTask()
 		case <-tl.eventLoop.done:
 			// 关闭定时器
 			if !tl.timer.Stop() {

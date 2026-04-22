@@ -159,7 +159,7 @@ func (el *eventLoopImpl) Async(fn func()) Promise {
 /*
 Await 等待 Promise 完成，并设定超时时间，以免无限等待。
 
-  - prom 需要等待的 Promise 实例，如果不是 Promise 实例，则会被包装成 Promise。
+  - prom 需要等待的 Promise 实例，如果不是 Promise 实例，则会被直接返回。
   - timeout 超时时间，单位为毫秒。
 
 返回值：v 是已决值，err 是拒绝理由，当 err 存在时，代表 Promise 被拒绝。

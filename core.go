@@ -143,19 +143,27 @@ type eventLoopImpl struct {
 // 参数：
 // - workerCount: 工作线程数量
 func StartEventLoop(workerCount int) EventLoop {
+	el := &eventLoopImpl{
+		microtaskQueue: make(chan func(), 1024*10),
+		macrotaskQueue: make(chan func(), 1024*10),
+		done:           make(chan struct{}),
+	}
+
 	config := &pool.Config{
 		BufferSize: 1024,
 	}
-	mgr := pool.New(1, config)
-	scheduler := pool.New(1, config)
-	worker := pool.New(workerCount, nil)
-	timeline := &timeLine{
-		tasks:   make([]*timedTask, 0, 1024*10),
-		timer:   time.NewTimer(time.Duration(math.MaxInt64)),
-		taskCh:  make(chan *timedTask, 1024*10),
-		clearCh: make(chan int, 1024*10),
+	el.looper = pool.New(1, config)
+	el.scheduler = pool.New(1, config)
+	el.worker = pool.New(workerCount, nil)
+	el.timeline = &timeLine{
+		nextID:    0,
+		tasks:     make([]*timedTask, 0, 1024*10),
+		timer:     time.NewTimer(time.Duration(math.MaxInt64)),
+		taskCh:    make(chan *timedTask, 1024*10),
+		clearCh:   make(chan int, 1024*10),
+		eventLoop: el,
 	}
-	hooks := &promiseHooks{
+	el.hooks = &promiseHooks{
 		createdHookKeys:   make([]string, 0, 64),
 		chainedHookKeys:   make([]string, 0, 64),
 		fulfilledHookKeys: make([]string, 0, 64),
@@ -164,18 +172,8 @@ func StartEventLoop(workerCount int) EventLoop {
 		hooks:             make(map[string]func(p Promise)),
 	}
 
-	el := &eventLoopImpl{
-		microtaskQueue: make(chan func(), 1024*10),
-		macrotaskQueue: make(chan func(), 1024*10),
-		looper:         mgr,
-		worker:         worker,
-		timeline:       timeline,
-		hooks:          hooks,
-		done:           make(chan struct{}),
-	}
-
-	mgr.Add(el.run)
-	scheduler.Add(timeline.run)
+	el.looper.Add(el.run)
+	el.scheduler.Add(el.timeline.run)
 
 	return el
 }
