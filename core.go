@@ -188,11 +188,12 @@ func (el *eventLoopImpl) Close() error {
 	close(el.done)
 	e1 := el.looper.Close()
 	e2 := el.worker.Close()
+	e3 := el.scheduler.Close()
 	if e1 != nil {
 		return e1
 	}
 	if e2 != nil {
 		return e2
 	}
-	return nil
+	return e3
 }
