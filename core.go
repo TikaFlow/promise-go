@@ -48,6 +48,9 @@ func (el *eventLoopImpl) NewPromise(exec Executor) Promise {
 QueueMicrotask 将回调函数添加到微任务队列末尾。
 */
 func (el *eventLoopImpl) QueueMicrotask(fn func()) {
+	if fn == nil {
+		return
+	}
 	el.microtaskQueue <- fn
 }
 
@@ -152,9 +155,13 @@ func StartEventLoop(workerCount int) EventLoop {
 	config := &pool.Config{
 		BufferSize: 1024,
 	}
+	var workerConfig *pool.Config
+	if workerCount == 1 {
+		workerConfig = config
+	}
 	el.looper = pool.New(1, config)
 	el.scheduler = pool.New(1, config)
-	el.worker = pool.New(workerCount, nil)
+	el.worker = pool.New(workerCount, workerConfig)
 	el.timeline = &timeLine{
 		nextID:    0,
 		tasks:     make([]*timedTask, 0, 1024*10),

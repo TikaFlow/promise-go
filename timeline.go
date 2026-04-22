@@ -136,6 +136,9 @@ SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数。
 返回一个定时器 ID，可通过调用 ClearTimeout 函数来清除定时器。
 */
 func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
+	if callback == nil {
+		return -1
+	}
 	return el.timeline.produceTask(callback, millis, false)
 }
 
@@ -147,6 +150,9 @@ SetInterval 模拟 setInterval 函数，在指定毫秒数后重复调用回调�
 返回一个定时器 ID，可通过调用 ClearInterval 函数来清除定时器。
 */
 func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
+	if callback == nil {
+		return -1
+	}
 	return el.timeline.produceTask(callback, millis, true)
 }
 
@@ -155,6 +161,9 @@ ClearTimeout 清除由 SetTimeout 函数创建的定时器。
   - id 定时器ID
 */
 func (el *eventLoopImpl) ClearTimeout(id int) {
+	if id == -1 {
+		return
+	}
 	el.timeline.clearCh <- id
 }
 
@@ -163,6 +172,9 @@ ClearInterval 清除由 SetInterval 函数创建的定时器。
   - id 定时器ID
 */
 func (el *eventLoopImpl) ClearInterval(id int) {
+	if id == -1 {
+		return
+	}
 	el.timeline.clearCh <- id
 }
 
@@ -176,6 +188,8 @@ func (tl *timeLine) run() {
 		case <-tl.timer.C:
 			tl.consumeTask()
 		case <-tl.eventLoop.done:
+			close(tl.taskCh)
+			close(tl.clearCh)
 			// 关闭定时器
 			if !tl.timer.Stop() {
 				select {
