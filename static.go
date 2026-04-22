@@ -2,7 +2,6 @@ package promise
 
 import (
 	"sync/atomic"
-	"time"
 )
 
 /*
@@ -169,13 +168,18 @@ func (el *eventLoopImpl) Await(prom any, timeout int64) (v any, err error) {
 		return nil, NewRangeError("await timeout must be greater than 0")
 	}
 
-	timer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
-	defer timer.Stop()
-
 	prom2, ok := prom.(Promise)
 	if !ok {
 		return prom, nil
 	}
+
+	wait := el.NewPromise(func(resolve, reject func(v any)) error {
+		el.SetTimeout(func() {
+			reject(NewTimeoutError("await timeout"))
+		}, timeout)
+		return nil
+	})
+
 	select {
 	case <-prom2.Done():
 		if prom2.State() == Rejected {
@@ -183,8 +187,12 @@ func (el *eventLoopImpl) Await(prom any, timeout int64) (v any, err error) {
 		} else {
 			v = prom2.Value()
 		}
-	case <-timer.C:
-		err = NewTimeoutError("await timeout")
+	case <-wait.Done():
+		if wait.State() == Rejected {
+			err = wait.Reason()
+		} else {
+			v = wait.Value()
+		}
 	}
 
 	return

@@ -111,20 +111,27 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 }
 
 func (tl *timeLine) consumeTask() {
-	if len(tl.tasks) > 0 && !tl.tasks[0].deadline.After(time.Now()) {
-		task := tl.tasks[0]
-		tl.tasks = tl.tasks[1:]
+	if len(tl.tasks) == 0 {
+		return
+	}
 
-		tl.queueMacrotask(task.callback)
+	if tl.tasks[0].deadline.After(time.Now()) {
+		tl.resetTimer(time.Until(tl.tasks[0].deadline))
+		return
+	}
 
-		if task.repeat {
-			task.deadline = time.Now().Add(time.Duration(task.millis) * time.Millisecond)
-			tl.appendTask(task)
-		}
+	task := tl.tasks[0]
+	tl.tasks = tl.tasks[1:]
 
-		if len(tl.tasks) > 0 {
-			tl.resetTimer(time.Until(tl.tasks[0].deadline))
-		}
+	tl.queueMacrotask(task.callback)
+
+	if task.repeat {
+		task.deadline = time.Now().Add(time.Duration(task.millis) * time.Millisecond)
+		tl.appendTask(task)
+	}
+
+	if len(tl.tasks) > 0 {
+		tl.resetTimer(time.Until(tl.tasks[0].deadline))
 	}
 }
 
