@@ -8,20 +8,22 @@ import (
 )
 
 // 嵌套
-func ExampleSetTimeout_nested() {
-	promise.SetTimeout(func() {
+func Example_setTimeout_nested() {
+	el := promise.StartClassicEventLoop()
+	el.SetTimeout(func() {
 		fmt.Println("[A]")
-		promise.SetTimeout(func() {
+		el.SetTimeout(func() {
 			fmt.Println("[C]")
 		}, 20)
 	}, 30)
 
-	promise.SetTimeout(func() {
+	el.SetTimeout(func() {
 		fmt.Println("[B]")
 	}, 50)
 
 	time.Sleep(time.Millisecond * 100)
 
+	_ = el.Close()
 	// Output:
 	// [A]
 	// [B]
@@ -29,21 +31,22 @@ func ExampleSetTimeout_nested() {
 }
 
 // 批量处理
-func ExampleAll() {
-	p1 := promise.NewPromise(func(resolve, reject func(v any)) error {
+func Example_all() {
+	el := promise.StartClassicEventLoop()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world1")
 		return nil
 	})
-	p2 := promise.NewPromise(func(resolve, reject func(v any)) error {
+	p2 := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world2")
 		return nil
 	})
-	p3 := promise.NewPromise(func(resolve, reject func(v any)) error {
+	p3 := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world3")
 		return nil
 	})
 
-	promise.All(p1, p2, p3).Then(func(v any) (any, error) {
+	el.All(p1, p2, p3).Then(func(v any) (any, error) {
 		fmt.Println(v.([]any)[0].(string))
 		fmt.Println(v.([]any)[1].(string))
 		fmt.Println(v.([]any)[2].(string))
@@ -52,6 +55,7 @@ func ExampleAll() {
 
 	time.Sleep(time.Millisecond * 50)
 
+	_ = el.Close()
 	// Output:
 	// hello world1
 	// hello world2

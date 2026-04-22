@@ -9,7 +9,8 @@ import (
 
 // 基础用法
 func Example_base() {
-	p := promise.NewPromise(func(resolve, reject func(v any)) error {
+	el := promise.StartClassicEventLoop()
+	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
 	})
@@ -21,13 +22,15 @@ func Example_base() {
 
 	time.Sleep(time.Millisecond * 50)
 
+	_ = el.Close()
 	// Output:
 	// hello world
 }
 
 // 链式调用
 func Example_chain() {
-	p := promise.NewPromise(func(resolve, reject func(v any)) error {
+	el := promise.StartClassicEventLoop()
+	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
 	})
@@ -42,7 +45,7 @@ func Example_chain() {
 			return v, nil
 		}, nil).
 		Catch(func(err error) (any, error) {
-			fmt.Println("Nothing happend here.")
+			fmt.Println("Nothing happened here.")
 			return nil, nil
 		}).
 		Finally(func() (any, error) {
@@ -52,6 +55,7 @@ func Example_chain() {
 
 	time.Sleep(time.Millisecond * 50)
 
+	_ = el.Close()
 	// Output:
 	// hello world
 	// hello world
@@ -61,16 +65,18 @@ func Example_chain() {
 // 宏任务 - 见 [Example_delay]
 
 // 微队列
-func ExampleQueueMicrotask() {
-	promise.QueueMicrotask(func() {
+func Example_queueMicrotask() {
+	el := promise.StartClassicEventLoop()
+	el.QueueMicrotask(func() {
 		fmt.Println("Microtask 1")
 	})
-	promise.QueueMicrotask(func() {
+	el.QueueMicrotask(func() {
 		fmt.Println("Microtask 2")
 	})
 
 	time.Sleep(time.Millisecond * 50)
 
+	_ = el.Close()
 	// Output:
 	// Microtask 1
 	// Microtask 2
@@ -78,36 +84,39 @@ func ExampleQueueMicrotask() {
 
 // 延迟执行
 func Example_delay() {
-	id1 := promise.SetTimeout(func() {
+	el := promise.StartClassicEventLoop()
+	id1 := el.SetTimeout(func() {
 		fmt.Println("Timeout 1")
 	}, 100)
 
 	var id2 int
-	id2 = promise.SetInterval(func() {
-		promise.ClearTimeout(id1)
-		promise.ClearInterval(id2)
+	id2 = el.SetInterval(func() {
+		el.ClearTimeout(id1)
+		el.ClearInterval(id2)
 		fmt.Println("Interval 1")
 	}, 50)
 
 	time.Sleep(time.Millisecond * 200)
 
+	_ = el.Close()
 	// Output:
 	// Interval 1
 }
 
 // Async与Await
 func Example_asyncAwait() {
-	promise.Async(func() {
+	el := promise.StartClassicEventLoop()
+	el.Async(func() {
 		// 模拟耗时任务
 		time.Sleep(time.Millisecond * 100)
 		fmt.Println("Macrotask 1")
 	})
 
-	p := promise.NewPromise(func(resolve, reject func(v any)) error {
+	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
 	})
-	v, err := promise.Await(p, 1000)
+	v, err := el.Await(p, 1000)
 	if err != nil {
 		fmt.Println(err)
 		return
