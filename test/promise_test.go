@@ -1800,7 +1800,7 @@ func TestAsyncCallOrderMacroDelay(t *testing.T) {
 		}, 20)
 	}, 30)
 	// 有延迟 - 看情况调大数字，go实在太快了，区区循环嗖一下就完成了
-	for i := range 1234 {
+	for i := range 12345 {
 		time.Sleep(time.Nanosecond)
 		_ = int64(i) * 2234 / 3234 % 4234
 	}
