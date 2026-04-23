@@ -68,7 +68,6 @@ func (el *eventLoopImpl) flushTasks() {
 	}
 }
 
-// [todo] 将worker池利用起来
 func (el *eventLoopImpl) pushTask(fn func()) {
 	el.worker.Add(fn)
 }
@@ -155,13 +154,9 @@ func StartEventLoop(workerCount int) EventLoop {
 	config := &pool.Config{
 		BufferSize: 1024,
 	}
-	var workerConfig *pool.Config
-	if workerCount == 1 {
-		workerConfig = config
-	}
 	el.looper = pool.New(1, config)
 	el.scheduler = pool.New(1, config)
-	el.worker = pool.New(workerCount, workerConfig)
+	el.worker = pool.New(workerCount, nil)
 	el.timeline = &timeLine{
 		nextID:    0,
 		tasks:     make([]*timedTask, 0, 1024*10),
@@ -183,10 +178,6 @@ func StartEventLoop(workerCount int) EventLoop {
 	el.scheduler.Add(el.timeline.run)
 
 	return el
-}
-
-func StartClassicEventLoop() EventLoop {
-	return StartEventLoop(1)
 }
 
 // Close 关闭事件循环。[io.Closer.Close]

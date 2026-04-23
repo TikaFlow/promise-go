@@ -9,7 +9,7 @@ import (
 
 // 基础用法
 func Example_base() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
@@ -29,7 +29,7 @@ func Example_base() {
 
 // 链式调用
 func Example_chain() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
@@ -66,7 +66,7 @@ func Example_chain() {
 
 // 微队列
 func Example_queueMicrotask() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	el.QueueMicrotask(func() {
 		fmt.Println("Microtask 1")
 	})
@@ -84,7 +84,7 @@ func Example_queueMicrotask() {
 
 // 延迟执行
 func Example_delay() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	id1 := el.SetTimeout(func() {
 		fmt.Println("Timeout 1")
 	}, 100)
@@ -105,7 +105,7 @@ func Example_delay() {
 
 // Async与Await
 func Example_asyncAwait() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	el.Async(func() {
 		// 模拟耗时任务
 		time.Sleep(time.Millisecond * 100)

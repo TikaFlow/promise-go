@@ -9,7 +9,7 @@ import (
 
 // 嵌套
 func Example_setTimeout_nested() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	el.SetTimeout(func() {
 		fmt.Println("[A]")
 		el.SetTimeout(func() {
@@ -32,7 +32,7 @@ func Example_setTimeout_nested() {
 
 // 批量处理
 func Example_all() {
-	el := promise.StartClassicEventLoop()
+	el := promise.StartEventLoop(1)
 	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world1")
 		return nil

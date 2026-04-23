@@ -14,7 +14,7 @@ var el EventLoop
 
 // 测试主函数
 func TestMain(m *testing.M) {
-	el = StartClassicEventLoop()
+	el = StartEventLoop(10)
 	res := m.Run()
 
 	_ = el.Close()

@@ -147,10 +147,11 @@ func (el *eventLoopImpl) Async(fn func()) Promise {
 	}
 
 	return el.NewPromise(func(resolve, reject func(v any)) error {
-		go func() {
+		task := func() {
 			fn()
 			resolve(nil)
-		}()
+		}
+		el.pushTask(task)
 		return nil
 	})
 }
