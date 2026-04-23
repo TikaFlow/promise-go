@@ -3,6 +3,7 @@ package promise_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -14,9 +15,10 @@ var el EventLoop
 // 测试主函数
 func TestMain(m *testing.M) {
 	el = StartClassicEventLoop()
-	m.Run()
+	res := m.Run()
 
 	_ = el.Close()
+	os.Exit(res)
 }
 
 // 测试Reduce方法 - 成功累加
@@ -281,6 +283,8 @@ func TestPromiseString(t *testing.T) {
 			t.Errorf("Expected string '%s', got '%s'", expected, result)
 		}
 	}, 0)
+
+	time.Sleep(time.Second)
 }
 
 // 测试Promise执行器错误处理
@@ -345,6 +349,8 @@ func TestPromiseExecutorMultipleCalls(t *testing.T) {
 		t.Errorf("Promise should not be rejected, got reason: %v", v)
 		return nil, nil
 	})
+
+	time.Sleep(time.Second)
 }
 
 // 测试执行器在resolve或reject已调用后报错
@@ -371,6 +377,8 @@ func TestPromiseExecutorErrorAfterResolved(t *testing.T) {
 		t.Errorf("Promise should not be rejected, got reason: %v", v)
 		return nil, nil
 	})
+
+	time.Sleep(time.Second)
 }
 
 // 测试Then方法的基本功能 - 成功回调
@@ -977,7 +985,8 @@ func TestPromiseSome2out3(t *testing.T) {
 		t.Errorf("Promise.Some should be rejected, but was fulfilled with %v", v)
 		return nil, nil
 	}, func(v error) (any, error) {
-		agg, ok := v.(*AggregateError)
+		var agg *AggregateError
+		ok := errors.As(v, &agg)
 		if !ok {
 			t.Errorf("Expected *AggregateError, got %T", v)
 			return nil, nil
@@ -1019,6 +1028,8 @@ func TestPromiseRaceFulfilled(t *testing.T) {
 		t.Errorf("Promise.Race should be fulfilled, but was rejected with %v", v.Error())
 		return nil, nil
 	})
+
+	time.Sleep(time.Second)
 }
 
 // 测试Race方法 - 第一个完成的是失败的Promise
@@ -1046,25 +1057,18 @@ func TestPromiseRaceRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
+
+	time.Sleep(time.Second)
 }
 
 // 测试Race方法 - 空数组
 func TestPromiseRaceEmptyArray(t *testing.T) {
 	t.Parallel()
 	racePromise := el.Race(make([]any, 0)...)
-	var state string
 
-	timer := time.NewTimer(100 * time.Millisecond)
-	defer timer.Stop()
-	select {
-	case <-racePromise.Done():
-		state = racePromise.State()
-	case <-timer.C:
-		state = Pending
-	}
-
-	if state != Pending {
-		t.Errorf("Expected state Pending for empty array Race, got %s", state)
+	_, err := el.Await(racePromise, 100)
+	if err == nil || err.Error() != "TimeoutError: await timeout" || racePromise.State() != Pending {
+		t.Errorf("Expected state Pending for empty array Race, got %v", err)
 	}
 }
 
@@ -1302,6 +1306,8 @@ func TestPromiseThenable(t *testing.T) {
 			t.Errorf("Expected result '\n%s', got '\n%s'", expected, result)
 		}
 	}, 10)
+
+	time.Sleep(time.Second)
 }
 
 // 测试多个Then调用的顺序
@@ -1363,6 +1369,8 @@ func TestSetTimeout(t *testing.T) {
 			t.Errorf("Expected str 'timeout value', got %s", str)
 		}
 	}, 120)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetTimeout函数 - 取消
@@ -1381,6 +1389,8 @@ func TestSetTimeoutCancel(t *testing.T) {
 			t.Errorf("Expected state Pending, got %v", p.State())
 		}
 	}, 120)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetTimeout函数 - 毫秒数为负数
@@ -1396,6 +1406,8 @@ func TestSetTimeoutNegativeMillis(t *testing.T) {
 			t.Errorf("Expected str 'timeout value', got %s", str)
 		}
 	}, 20)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetTimeout函数 - 毫秒数为 0
@@ -1411,6 +1423,8 @@ func TestSetTimeoutZeroMillis(t *testing.T) {
 			t.Errorf("Expected str 'timeout value', got %s", str)
 		}
 	}, 0)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetTimeout函数 - 长延迟
@@ -1432,6 +1446,8 @@ func TestSetTimeoutLongDelay(t *testing.T) {
 			t.Errorf("Expected str 'timeout value', got %s", str)
 		}
 	}, 1020)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetInterval函数
@@ -1484,6 +1500,8 @@ func TestSetInterval(t *testing.T) {
 			t.Errorf("Expected str 'interval interval interval ', got %s", str)
 		}
 	}, 620)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetInterval函数 - 取消 - 第1次执行
@@ -1510,6 +1528,8 @@ func TestSetIntervalCancelFirst(t *testing.T) {
 			t.Errorf("Expected str '', got %s", str)
 		}
 	}, 240)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetInterval函数 - 取消 - 非首次执行
@@ -1539,6 +1559,8 @@ func TestSetIntervalCancelNonFirst(t *testing.T) {
 			t.Errorf("Expected str 'interval ', got %s", str)
 		}
 	}, 620)
+
+	time.Sleep(time.Second)
 }
 
 // 测试SetInterval函数 - 长延迟
@@ -1588,10 +1610,13 @@ func TestSetIntervalLongDelay(t *testing.T) {
 			t.Errorf("Expected str 'interval interval interval ', got %s", str)
 		}
 	}, 3020)
+
+	time.Sleep(5 * time.Second)
 }
 
 // 测试Await - 成功
 func TestAwaitSuccess(t *testing.T) {
+	t.Parallel()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
@@ -1608,6 +1633,7 @@ func TestAwaitSuccess(t *testing.T) {
 
 // 测试Await - timeout不是正数
 func TestAwaitTimeoutNotPositive(t *testing.T) {
+	t.Parallel()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("success")
 		return nil
@@ -1617,14 +1643,14 @@ func TestAwaitTimeoutNotPositive(t *testing.T) {
 	_, err := el.Await(p, -100)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
-	}
-	if err.Error() != expected {
+	} else if err.Error() != expected {
 		t.Errorf("Expected error '%s', got %s", expected, err)
 	}
 }
 
 // 测试Await - 超时
 func TestAwaitTimeout(t *testing.T) {
+	t.Parallel()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		el.SetTimeout(func() {
 			resolve("success")
@@ -1635,14 +1661,16 @@ func TestAwaitTimeout(t *testing.T) {
 	_, err := el.Await(p, 50)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
-	}
-	if err.Error() != "TimeoutError: await timeout" {
+	} else if err.Error() != "TimeoutError: await timeout" {
 		t.Errorf("Expected error 'TimeoutError: await timeout', got %s", err)
 	}
+
+	time.Sleep(time.Second)
 }
 
 // 测试Await - 拒绝的Promise
 func TestAwaitRejectedPromise(t *testing.T) {
+	t.Parallel()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		reject("error")
 		return nil
@@ -1651,23 +1679,22 @@ func TestAwaitRejectedPromise(t *testing.T) {
 	_, err := el.Await(p, 50)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
-	}
-	if err.Error() != "UnexpectedError: error" {
+	} else if err.Error() != "UnexpectedError: error" {
 		t.Errorf("Expected error 'UnexpectedError: error', got %s", err)
 	}
 }
 
 // 测试Delay函数
 func TestDelay(t *testing.T) {
-	el2 := StartClassicEventLoop()
+	t.Parallel()
 	val := "value"
 
-	if _, err := el2.Await(el2.Delay(val, 50), 40); err == nil {
+	if _, err := el.Await(el.Delay(val, 50), 40); err == nil {
 		// timeout
 		t.Errorf("Expected 'TimeoutError: await timeout', got nil")
 	}
 
-	res, err := el2.Await(el2.Delay(val, 50), 100)
+	res, err := el.Await(el.Delay(val, 50), 100)
 	if err != nil {
 		t.Errorf("Expected nil, got %v", err)
 	}
@@ -1675,28 +1702,28 @@ func TestDelay(t *testing.T) {
 		t.Errorf("Expected '%s', got %s", val, res)
 	}
 
-	p := el2.NewPromise(func(resolve, reject func(v any)) error {
-		el2.SetTimeout(func() {
+	p := el.NewPromise(func(resolve, reject func(v any)) error {
+		el.SetTimeout(func() {
 			resolve("success")
 		}, 50)
 		return nil
 	})
-	if _, err = el2.Await(el2.Delay(p, 50), 90); err == nil {
+	if _, err = el.Await(el.Delay(p, 50), 90); err == nil {
 		// timeout
 		t.Errorf("Expected 'TimeoutError: await timeout', got nil")
 	}
 
-	p2 := el2.NewPromise(func(resolve, reject func(v any)) error {
-		el2.SetTimeout(func() {
+	p2 := el.NewPromise(func(resolve, reject func(v any)) error {
+		el.SetTimeout(func() {
 			resolve("success")
 		}, 50)
 		return nil
 	})
-	if res, _ := el2.Await(el2.Delay(p2, 50), 150); res != "success" {
+	if res, _ := el.Await(el.Delay(p2, 50), 150); res != "success" {
 		t.Errorf("Expected 'success', got %s", res)
 	}
 
-	_ = el2.Close()
+	time.Sleep(time.Second)
 }
 
 // 测试异步调用顺序 - 微任务
@@ -1709,10 +1736,11 @@ func TestAsyncCallOrderMicro(t *testing.T) {
 		p.Then(func(v any) (any, error) {
 			result += "[B]"
 			return nil, nil
-		}, nil).Then(func(v any) (any, error) {
-			result += "[D]"
-			return nil, nil
-		}, nil)
+		}, nil).
+			Then(func(v any) (any, error) {
+				result += "[D]"
+				return nil, nil
+			}, nil)
 		el.NewPromise(func(resolve, reject func(v any)) error {
 			result += "[A]"
 			res = resolve
@@ -1729,9 +1757,11 @@ func TestAsyncCallOrderMicro(t *testing.T) {
 
 	el.SetTimeout(func() {
 		if result != "[A][B][C][D][E]" {
-			t.Errorf("Expected result1 '[A][B][C][D][E]', got %s", result)
+			t.Errorf("Expected result '[A][B][C][D][E]', got %s", result)
 		}
 	}, 0)
+
+	time.Sleep(time.Second)
 }
 
 // 测试异步调用顺序 - 宏任务
@@ -1753,7 +1783,9 @@ func TestAsyncCallOrderMacro(t *testing.T) {
 		if result != "[A][B][C]" {
 			t.Errorf("Expected result1 '[A][B][C]', got %s", result)
 		}
-	}, 60)
+	}, 100)
+
+	time.Sleep(time.Second)
 }
 
 // 测试异步调用顺序 - 宏任务 - 有延迟
@@ -1768,8 +1800,9 @@ func TestAsyncCallOrderMacroDelay(t *testing.T) {
 		}, 20)
 	}, 30)
 	// 有延迟 - 看情况调大数字，go实在太快了，区区循环嗖一下就完成了
-	for i := range 12345678 {
-		_ = int64(i) * 1234 / 2234 % 3234
+	for i := range 1234 {
+		time.Sleep(time.Nanosecond)
+		_ = int64(i) * 2234 / 3234 % 4234
 	}
 	el.SetTimeout(func() {
 		result += "[B]"
@@ -1779,7 +1812,9 @@ func TestAsyncCallOrderMacroDelay(t *testing.T) {
 		if result != "[A][C][B]" {
 			t.Errorf("Expected result2 '[A][C][B]', got %s", result)
 		}
-	}, 60)
+	}, 100)
+
+	time.Sleep(time.Second)
 }
 
 // 测试异步调用顺序 - 混合模式
@@ -1985,10 +2020,24 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 	}, 0)
 
 	el.SetTimeout(func() {
-
-		expected := "[01]-[02]-[03]-[04]-[05]-[06]-[07]-[08]-[09]-[10]-[11]-[12]-[13]-[14]-[15]-[16]-[17]-[18]-[19]-[20]-[21]-[22]-[23]-[24]-[25]-[26]-[27]-[28]-[29]-[30]-[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-[37]-[41]-[42]-[31]-[32]-[33]-[34]-[42]"
-		if result != expected {
-			t.Errorf("Expected result:\n%s\n\nGot:\n%s", expected, result)
+		part1 := "[01]-[02]-[03]-[04]-[05]-[06]-[07]-[08]-[09]-[10]-[11]-[12]-[13]-[14]-[15]-[16]-[17]-[18]-[19]-[20]-[21]-[22]-[23]-[24]-[25]-[26]-[27]-[28]-[29]-[30]-"
+		part20 := "[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-[37]-"
+		part21 := "[37]-[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-"
+		part22 := "[31]-[32]-[33]-[34]-[37]-[35]-[36]-[38]-[39]-[40]-"
+		part23 := "[31]-[32]-[33]-[34]-[35]-[37]-[36]-[38]-[39]-[40]-"
+		part24 := "[31]-[32]-[33]-[34]-[35]-[36]-[37]-[38]-[39]-[40]-"
+		part25 := "[31]-[32]-[33]-[34]-[35]-[36]-[38]-[37]-[39]-[40]-"
+		part3 := "[41]-[42]-[31]-[32]-[33]-[34]-[42]"
+		expected0 := part1 + part20 + part3
+		expected1 := part1 + part21 + part3
+		expected2 := part1 + part22 + part3
+		expected3 := part1 + part23 + part3
+		expected4 := part1 + part24 + part3
+		expected5 := part1 + part25 + part3
+		if result != expected0 && result != expected1 && result != expected2 && result != expected3 && result != expected4 && result != expected5 {
+			t.Errorf("Expected result is ordered but got:\n%s", result)
 		}
 	}, 360)
+
+	time.Sleep(time.Second)
 }

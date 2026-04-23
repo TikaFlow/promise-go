@@ -2,7 +2,6 @@ package promise
 
 import (
 	"io"
-	"math"
 	"time"
 
 	pool "github.com/TikaFlow/worker-pool"
@@ -62,13 +61,14 @@ func (el *eventLoopImpl) flushTasks() {
 	close(el.macrotaskQueue)
 	close(el.microtaskQueue)
 	for task := range el.microtaskQueue {
-		el.pushTask(task)
+		task()
 	}
 	for task := range el.macrotaskQueue {
-		el.pushTask(task)
+		task()
 	}
 }
 
+// [todo] 将worker池利用起来
 func (el *eventLoopImpl) pushTask(fn func()) {
 	el.worker.Add(fn)
 }
@@ -80,19 +80,19 @@ func (el *eventLoopImpl) run() {
 	for {
 		select {
 		case task := <-el.microtaskQueue:
-			el.pushTask(task)
+			task()
 		case <-el.done:
 			return
 		default:
 			select {
 			case task := <-el.macrotaskQueue:
-				el.pushTask(task)
+				task()
 			default:
 				select {
 				case task := <-el.microtaskQueue:
-					el.pushTask(task)
+					task()
 				case task := <-el.macrotaskQueue:
-					el.pushTask(task)
+					task()
 				case <-el.done:
 					return
 				}
@@ -165,7 +165,7 @@ func StartEventLoop(workerCount int) EventLoop {
 	el.timeline = &timeLine{
 		nextID:    0,
 		tasks:     make([]*timedTask, 0, 1024*10),
-		timer:     time.NewTimer(time.Duration(math.MaxInt64)),
+		timer:     time.NewTimer(100 * 365 * 24 * time.Hour),
 		taskCh:    make(chan *timedTask, 1024*10),
 		clearCh:   make(chan int, 1024*10),
 		eventLoop: el,
@@ -194,8 +194,8 @@ func (el *eventLoopImpl) Close() error {
 	el.flushTasks()
 	close(el.done)
 	e1 := el.looper.Close()
-	e2 := el.worker.Close()
-	e3 := el.scheduler.Close()
+	e2 := el.scheduler.Close()
+	e3 := el.worker.Close()
 	if e1 != nil {
 		return e1
 	}

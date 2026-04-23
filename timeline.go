@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-const (
-	minDelay int64 = 1
-)
-
 type timeLine struct {
 	nextID    int
 	idLock    sync.Mutex
@@ -90,8 +86,8 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 		return -1
 	}
 
-	if millis < minDelay {
-		millis = minDelay
+	if millis < 0 {
+		millis = 0
 	}
 
 	tl.idLock.Lock()
@@ -111,26 +107,21 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 }
 
 func (tl *timeLine) consumeTask() {
-	if len(tl.tasks) == 0 {
-		return
+	called := false
+	for len(tl.tasks) > 0 && !tl.tasks[0].deadline.After(time.Now()) {
+		task := tl.tasks[0]
+		tl.tasks = tl.tasks[1:]
+
+		tl.queueMacrotask(task.callback)
+		called = true
+
+		if task.repeat {
+			task.deadline = time.Now().Add(time.Duration(task.millis) * time.Millisecond)
+			tl.appendTask(task)
+		}
 	}
 
-	if tl.tasks[0].deadline.After(time.Now()) {
-		tl.resetTimer(time.Until(tl.tasks[0].deadline))
-		return
-	}
-
-	task := tl.tasks[0]
-	tl.tasks = tl.tasks[1:]
-
-	tl.queueMacrotask(task.callback)
-
-	if task.repeat {
-		task.deadline = time.Now().Add(time.Duration(task.millis) * time.Millisecond)
-		tl.appendTask(task)
-	}
-
-	if len(tl.tasks) > 0 {
+	if len(tl.tasks) > 0 && called {
 		tl.resetTimer(time.Until(tl.tasks[0].deadline))
 	}
 }
