@@ -1447,7 +1447,7 @@ func TestSetTimeoutLongDelay(t *testing.T) {
 		}
 	}, 1020)
 
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 }
 
 // 测试SetInterval函数
