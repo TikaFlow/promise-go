@@ -1,0 +1,319 @@
+package promise_test
+
+import (
+	"errors"
+	"fmt"
+	"testing"
+	"time"
+)
+
+// 测试Catch方法
+func TestCatch(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+
+	p1.Catch(func(v error) (any, error) {
+		return "caught: " + v.Error(), nil
+	}).Then(func(v any) (any, error) {
+		if v != "caught: UnexpectedError: error" {
+			t.Errorf("Expected value 'caught: UnexpectedError: error', got %v", v)
+		}
+		return nil, nil
+	}, nil)
+}
+
+// 测试Catch穿透
+func TestCatchPassThrough(t *testing.T) {
+	t.Parallel()
+	p := el.Resolve("success")
+
+	p.Then(func(v any) (any, error) {
+		return v.(string) + " passed 1,", nil
+	}, nil).Then(func(v any) (any, error) {
+		return v.(string) + " passed 2,", nil
+	}, func(r error) (any, error) {
+		t.Errorf("Promise should not be rejected, got reason: %v", r.Error())
+		return nil, nil
+	}).Then(func(v any) (any, error) {
+		return nil, errors.New(v.(string) + " rejected")
+	}, nil).Then(func(v any) (any, error) {
+		t.Errorf("Promise should not be fulfilled, got value: %v", v)
+		return nil, nil
+	}, nil).Catch(func(r error) (any, error) {
+		if r.Error() != "success passed 1, passed 2, rejected" {
+			t.Errorf("Expected value 'success passed 1, passed 2, rejected', got %v", r.Error())
+		}
+		return nil, nil
+	})
+}
+
+// 测试Finally方法抛出错误
+func TestFinallyError(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("success")
+		return nil
+	})
+
+	p1.Finally(func() (any, error) {
+		return nil, errors.New("finally error")
+	}).Then(func(v any) (any, error) {
+		t.Errorf("Expected promise to be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v error) (any, error) {
+		if v.Error() != "finally error" {
+			t.Errorf("Expected error value 'finally error', got %v", v.Error())
+		}
+		return nil, nil
+	})
+}
+
+// 测试Finally方法 - 成功状态
+func TestFinallyFulfilled(t *testing.T) {
+	t.Parallel()
+	finallyCalled := false
+
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("success")
+		return nil
+	})
+
+	p1.Finally(func() (any, error) {
+		finallyCalled = true
+		return nil, nil
+	}).Then(func(v any) (any, error) {
+		if !finallyCalled {
+			t.Errorf("Finally callback was not called")
+		}
+		if v != "success" {
+			t.Errorf("Expected value 'success', got %v", v)
+		}
+		return nil, nil
+	}, nil)
+}
+
+// 测试Finally方法 - 拒绝状态
+func TestFinallyRejected(t *testing.T) {
+	t.Parallel()
+	finallyCalled := false
+
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+
+	p1.Finally(func() (any, error) {
+		finallyCalled = true
+		return nil, nil
+	}).Then(nil, func(v error) (any, error) {
+		if !finallyCalled {
+			t.Errorf("Finally callback was not called")
+		}
+		if v.Error() != "error" {
+			t.Errorf("Expected value 'error', got %v", v.Error())
+		}
+		return nil, nil
+	})
+}
+
+// 测试Finally方法返回被拒绝的Promise
+func TestFinallyReturnsRejectedPromise(t *testing.T) {
+	t.Parallel()
+	rejectedPromise := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("rejected from finally")
+		return nil
+	})
+
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("success")
+		return nil
+	})
+
+	p1.Finally(func() (any, error) {
+		return rejectedPromise, nil
+	}).Then(func(v any) (any, error) {
+		t.Errorf("Expected promise to be rejected, but was fulfilled with %v", v)
+		return nil, nil
+	}, func(v error) (any, error) {
+		if v.Error() != "UnexpectedError: rejected from finally" {
+			t.Errorf("Expected rejection reason 'UnexpectedError: rejected from finally', got %s", v.Error())
+		}
+		return nil, nil
+	})
+}
+
+// 测试String函数的格式化输出
+func TestString(t *testing.T) {
+	t.Parallel()
+	el.SetTimeout(func() {
+		p := el.NewPromise(func(resolve, reject func(v any)) error {
+			resolve("success")
+			return nil
+		})
+
+		expected := "Promise<fulfilled>, value: success"
+		result := fmt.Sprintf("%s", p)
+		if result != expected {
+			t.Errorf("Expected string '%s', got '%s'", expected, result)
+		}
+	}, 0)
+
+	time.Sleep(time.Second)
+}
+
+// 测试Then方法回调函数抛出错误
+func TestThenCallbackError(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("value")
+		return nil
+	})
+
+	p1.Then(func(v any) (any, error) {
+		return nil, errors.New("callback error")
+	}, nil).Then(nil, func(v error) (any, error) {
+		if v.Error() != "callback error" {
+			t.Errorf("Expected error value 'callback error', got %v", v.Error())
+		}
+		return nil, nil
+	})
+
+	p2 := el.Reject("error")
+	p2.Then(nil, func(v error) (any, error) {
+		return nil, errors.New("callback error")
+	}).Then(nil, func(v error) (any, error) {
+		if v.Error() != "callback error" {
+			t.Errorf("Expected error value 'callback error', got %v", v.Error())
+		}
+		return nil, nil
+	})
+}
+
+// 测试Then方法链式调用
+func TestThenChaining(t *testing.T) {
+	t.Parallel()
+	el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve(1)
+		return nil
+	}).Then(func(v any) (any, error) {
+		return v.(int) + 1, nil
+	}, nil).Then(func(v any) (any, error) {
+		return v.(int) * 2, nil
+	}, nil).Then(func(v any) (any, error) {
+		if v != 4 {
+			t.Errorf("Expected final value 4 after chaining, got %v", v)
+		}
+		return nil, nil
+	}, nil)
+}
+
+// 测试Then方法的基本功能 - 成功回调
+func TestThenFulfilled(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve(1)
+		return nil
+	})
+
+	p1.Then(func(v any) (any, error) {
+		return v.(int) + 1, nil
+	}, nil).Then(func(v any) (any, error) {
+		if v != 2 {
+			t.Errorf("Expected value 2 after then, got %v", v)
+		}
+		return nil, nil
+	}, nil)
+}
+
+// 测试多个Then调用的顺序
+func TestThenMultipleOrder(t *testing.T) {
+	t.Parallel()
+	p := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("value")
+		return nil
+	})
+
+	var results []string
+
+	p.Then(func(v any) (any, error) {
+		results = append(results, "then1")
+		return v, nil
+	}, nil)
+
+	p.Then(func(v any) (any, error) {
+		results = append(results, "then2")
+		return v, nil
+	}, nil)
+
+	p.Then(func(v any) (any, error) {
+		results = append(results, "then3")
+		return v, nil
+	}, nil)
+
+	expected := []string{"then1", "then2", "then3"}
+	p.Finally(func() (any, error) {
+		if len(results) != len(expected) {
+			t.Errorf("Expected %d results, got %d", len(expected), len(results))
+		} else {
+			for i := range results {
+				if results[i] != expected[i] {
+					t.Errorf("Expected result %d to be '%s', got '%s'", i, expected[i], results[i])
+				}
+			}
+		}
+		return nil, nil
+	})
+}
+
+// 测试Then方法的基本功能 - 拒绝回调
+func TestThenRejected(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+
+	p1.Then(nil, func(v error) (any, error) {
+		return "handled: " + v.Error(), nil
+	}).Then(func(v any) (any, error) {
+		if v != "handled: UnexpectedError: error" {
+			t.Errorf("Expected value 'handled: UnexpectedError: error', got %v", v)
+		}
+		return nil, nil
+	}, nil)
+}
+
+// 测试Then方法的穿透 - 成功状态
+func TestThenPassThroughFulfilled(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("value")
+		return nil
+	})
+
+	p1.Then(nil, nil).Then(func(v any) (any, error) {
+		if v != "value" {
+			t.Errorf("Expected value 'value' after pass through, got %v", v)
+		}
+		return nil, nil
+	}, nil)
+}
+
+// 测试Then方法的穿透 - 拒绝状态
+func TestThenPassThroughRejected(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("reason")
+		return nil
+	})
+
+	p1.Then(nil, nil).Then(nil, func(v error) (any, error) {
+		if v.Error() != "UnexpectedError: reason" {
+			t.Errorf("Expected rejection reason 'UnexpectedError: reason' after pass through, got %v", v.Error())
+		}
+		return nil, nil
+	})
+}

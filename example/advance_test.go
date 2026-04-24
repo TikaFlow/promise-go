@@ -10,6 +10,7 @@ import (
 // 嵌套
 func Example_setTimeout_nested() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	el.SetTimeout(func() {
 		fmt.Println("[A]")
 		el.SetTimeout(func() {
@@ -22,8 +23,6 @@ func Example_setTimeout_nested() {
 	}, 50)
 
 	time.Sleep(time.Millisecond * 100)
-
-	_ = el.Close()
 	// Output:
 	// [A]
 	// [B]
@@ -33,6 +32,7 @@ func Example_setTimeout_nested() {
 // 批量处理
 func Example_all() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world1")
 		return nil
@@ -54,8 +54,6 @@ func Example_all() {
 	}, nil)
 
 	time.Sleep(time.Millisecond * 50)
-
-	_ = el.Close()
 	// Output:
 	// hello world1
 	// hello world2

@@ -10,6 +10,7 @@ import (
 // 基础用法
 func Example_base() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
@@ -21,8 +22,6 @@ func Example_base() {
 	}, nil)
 
 	time.Sleep(time.Millisecond * 50)
-
-	_ = el.Close()
 	// Output:
 	// hello world
 }
@@ -30,6 +29,7 @@ func Example_base() {
 // 链式调用
 func Example_chain() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("hello world")
 		return nil
@@ -54,19 +54,16 @@ func Example_chain() {
 		})
 
 	time.Sleep(time.Millisecond * 50)
-
-	_ = el.Close()
 	// Output:
 	// hello world
 	// hello world
 	// Finally.
 }
 
-// 宏任务 - 见 [Example_delay]
-
 // 微队列
 func Example_queueMicrotask() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	el.QueueMicrotask(func() {
 		fmt.Println("Microtask 1")
 	})
@@ -75,16 +72,15 @@ func Example_queueMicrotask() {
 	})
 
 	time.Sleep(time.Millisecond * 50)
-
-	_ = el.Close()
 	// Output:
 	// Microtask 1
 	// Microtask 2
 }
 
-// 延迟执行
-func Example_delay() {
+// 宏任务
+func Example_macroTask() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	id1 := el.SetTimeout(func() {
 		fmt.Println("Timeout 1")
 	}, 100)
@@ -97,8 +93,6 @@ func Example_delay() {
 	}, 50)
 
 	time.Sleep(time.Millisecond * 200)
-
-	_ = el.Close()
 	// Output:
 	// Interval 1
 }
@@ -106,6 +100,7 @@ func Example_delay() {
 // Async与Await
 func Example_asyncAwait() {
 	el := promise.StartEventLoop(1)
+	defer el.Stop()
 	el.Async(func() {
 		// 模拟耗时任务
 		time.Sleep(time.Millisecond * 100)
@@ -116,7 +111,7 @@ func Example_asyncAwait() {
 		resolve("hello world")
 		return nil
 	})
-	v, err := el.Await(p, 1000)
+	v, err := el.Await(p, 100)
 	if err != nil {
 		fmt.Println(err)
 		return
