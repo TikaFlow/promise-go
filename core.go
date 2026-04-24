@@ -1,7 +1,6 @@
 package promise
 
 import (
-	"io"
 	"time"
 
 	pool "github.com/TikaFlow/worker-pool"
@@ -101,7 +100,7 @@ func (el *eventLoopImpl) run() {
 }
 
 type EventLoop interface {
-	io.Closer
+	Stop()
 	SetTimeout(callback func(), millis int64) int
 	SetInterval(callback func(), millis int64) int
 	ClearTimeout(id int)
@@ -180,18 +179,11 @@ func StartEventLoop(workerCount int) EventLoop {
 	return el
 }
 
-// Close 关闭事件循环。[io.Closer.Close]
-func (el *eventLoopImpl) Close() error {
+// Stop 关闭事件循环。
+func (el *eventLoopImpl) Stop() {
 	el.flushTasks()
 	close(el.done)
-	e1 := el.looper.Close()
-	e2 := el.scheduler.Close()
-	e3 := el.worker.Close()
-	if e1 != nil {
-		return e1
-	}
-	if e2 != nil {
-		return e2
-	}
-	return e3
+	_ = el.looper.Close()
+	_ = el.scheduler.Close()
+	_ = el.worker.Close()
 }
