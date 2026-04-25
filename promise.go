@@ -5,9 +5,7 @@ import (
 	"sync"
 )
 
-/*
-handler 表示待处理的 Promise 回调。
-*/
+// 待处理的 Promise 回调
 type handler struct {
 	onFulfilled ThenCallback
 	onRejected  CatchCallback
@@ -16,9 +14,7 @@ type handler struct {
 	prom *promiseImpl
 }
 
-/*
-promiseImpl 表示 Promise 的具体实现类。
-*/
+// 内部实现类
 type promiseImpl struct {
 	value           any
 	reason          error
@@ -38,39 +34,31 @@ func (prom *promiseImpl) State() string {
 	return prom.state
 }
 
-/*
-[Promise.Done]
-*/
+// Done [Promise.Done]
 func (prom *promiseImpl) Done() <-chan struct{} {
 	return prom.settled
 }
 
-/*
-[Promise.Value]
-*/
+// Value [Promise.Value]
 func (prom *promiseImpl) Value() any {
 	prom.dataLock.RLock()
 	defer prom.dataLock.RUnlock()
 	return prom.value
 }
 
-/*
-[Promise.Reason]
-*/
+// Reason [Promise.Reason]
 func (prom *promiseImpl) Reason() error {
 	prom.dataLock.RLock()
 	defer prom.dataLock.RUnlock()
 	return prom.reason
 }
 
-/*
-[Promise.Then]
-*/
+// Then [Promise.Then]
 func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected CatchCallback) Promise {
 	prom2 := prom.eventLoop.NewPromise(func(resolve, reject func(v any)) error {
 		return nil
 	})
-	prom.eventLoop.hooks.callHooks(PromiseChained, prom)
+	prom.eventLoop.hooks.callHooks(OnChained, prom)
 	prom.settledHandlers <- &handler{
 		onFulfilled: onFulfilled,
 		onRejected:  onRejected,
@@ -84,18 +72,14 @@ func (prom *promiseImpl) Then(onFulfilled ThenCallback, onRejected CatchCallback
 	return prom2
 }
 
-/*
-[Promise.Catch]
-*/
+// Catch [Promise.Catch]
 func (prom *promiseImpl) Catch(onRejected CatchCallback) Promise {
 	return prom.Then(nil, onRejected)
 }
 
-/*
-[Promise.Finally]
-*/
+// Finally [Promise.Finally]
 func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
-	res_cb := func(v any) (any, error) {
+	resCb := func(v any) (any, error) {
 		if onFinally == nil {
 			return v, nil
 		}
@@ -114,16 +98,14 @@ func (prom *promiseImpl) Finally(onFinally FinallyCallback) Promise {
 
 		return v, nil
 	}
-	rej_cb := func(r error) (any, error) {
-		return res_cb(r)
+	rejCb := func(r error) (any, error) {
+		return resCb(r)
 	}
 
-	return prom.Then(res_cb, rej_cb)
+	return prom.Then(resCb, rejCb)
 }
 
-/*
-[fmt.Stringer.String]
-*/
+// String [fmt.Stringer.String]
 func (prom *promiseImpl) String() string {
 	prom.dataLock.RLock()
 	defer prom.dataLock.RUnlock()

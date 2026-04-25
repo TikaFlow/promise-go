@@ -1,5 +1,6 @@
 package promise
 
+// 解决一个 [Promise]
 func resolvePromise(prom *promiseImpl, value any) {
 	if prom == nil {
 		return
@@ -37,11 +38,12 @@ func resolvePromise(prom *promiseImpl, value any) {
 	prom.value = value
 	prom.dataLock.Unlock()
 	close(prom.settled)
-	prom.eventLoop.hooks.callHooks(PromiseSettled, prom)
-	prom.eventLoop.hooks.callHooks(PromiseFulfilled, prom)
+	prom.eventLoop.hooks.callHooks(OnSettled, prom)
+	prom.eventLoop.hooks.callHooks(OnFulfilled, prom)
 	flushHandlers(prom)
 }
 
+// 拒绝一个 [Promise]
 func rejectPromise(prom *promiseImpl, r any) {
 	if prom == nil {
 		return
@@ -61,11 +63,12 @@ func rejectPromise(prom *promiseImpl, r any) {
 	prom.reason = reason
 	prom.dataLock.Unlock()
 	close(prom.settled)
-	prom.eventLoop.hooks.callHooks(PromiseSettled, prom)
-	prom.eventLoop.hooks.callHooks(PromiseRejected, prom)
+	prom.eventLoop.hooks.callHooks(OnSettled, prom)
+	prom.eventLoop.hooks.callHooks(OnRejected, prom)
 	flushHandlers(prom)
 }
 
+// 调用 [Promise] 的回调函数
 func flushHandlers(cur *promiseImpl) {
 	// 2.2.6 then 可以注册多次，且会按照注册顺序执行
 	for {

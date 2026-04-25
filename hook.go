@@ -5,35 +5,27 @@ import (
 	"sync"
 )
 
+// HookType 钩子类型
 type HookType string
 
 const (
-	/*
-		PromiseCreated 当 Promise 实例被创建时调用。
-	*/
-	PromiseCreated HookType = "created"
+	// OnCreated 当 Promise 实例被创建时调用。
+	OnCreated HookType = "created"
 
-	/*
-		PromiseChained 当 Promise 实例被链式调用时调用。
-	*/
-	PromiseChained HookType = "chained"
+	// OnChained 当 Promise 实例被链式调用时调用。
+	OnChained HookType = "chained"
 
-	/*
-		PromiseFulfilled 当 Promise 实例被成功解决时调用。
-	*/
-	PromiseFulfilled HookType = "fulfilled"
+	// OnFulfilled 当 Promise 实例解决时调用。
+	OnFulfilled HookType = "fulfilled"
 
-	/*
-		PromiseRejected 当 Promise 实例被拒绝时调用。
-	*/
-	PromiseRejected HookType = "rejected"
+	// OnRejected 当 Promise 实例拒绝时调用。
+	OnRejected HookType = "rejected"
 
-	/*
-		PromiseSettled 当 Promise 实例被解决（无论成功或拒绝）时调用。
-	*/
-	PromiseSettled HookType = "settled"
+	// OnSettled 当 Promise 实例被解决（无论成功或拒绝）时调用。
+	OnSettled HookType = "settled"
 )
 
+// 钩子实例定义
 type promiseHooks struct {
 	createdHookKeys   []string
 	chainedHookKeys   []string
@@ -44,37 +36,33 @@ type promiseHooks struct {
 	hooksLock         sync.RWMutex
 }
 
+// 调用具体钩子
 func (hk *promiseHooks) callHook(slice []string, p Promise) {
 	for _, key := range slice {
 		hk.hooks[key](p)
 	}
 }
 
+// 通过钩子类型调用钩子
 func (hk *promiseHooks) callHooks(event HookType, p Promise) {
 	hk.hooksLock.RLock()
 	defer hk.hooksLock.RUnlock()
 
 	switch event {
-	case PromiseCreated:
+	case OnCreated:
 		hk.callHook(hk.createdHookKeys, p)
-	case PromiseChained:
+	case OnChained:
 		hk.callHook(hk.chainedHookKeys, p)
-	case PromiseFulfilled:
+	case OnFulfilled:
 		hk.callHook(hk.fulfilledHookKeys, p)
-	case PromiseRejected:
+	case OnRejected:
 		hk.callHook(hk.rejectedHookKeys, p)
-	case PromiseSettled:
+	case OnSettled:
 		hk.callHook(hk.settledHookKeys, p)
 	}
 }
 
-/*
-On 注册一个 Promise 钩子函数。
-  - event: 钩子事件类型，可选值为 [PromiseCreated]/[PromiseChained]/[PromiseFulfilled]/[PromiseRejected]/[PromiseSettled]。
-  - hook: 钩子函数，当事件触发时调用，并传入触发的 Promise 实例作为参数。
-
-返回值：注册成功返回钩子函数的唯一标识，可用于后续移除钩子函数，失败返回空字符串。
-*/
+// On [EventLoop.On]
 func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 	if hook == nil {
 		return ""
@@ -91,19 +79,19 @@ func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 	}
 
 	switch event {
-	case PromiseCreated:
+	case OnCreated:
 		el.hooks.createdHookKeys = append(el.hooks.createdHookKeys, key)
 		el.hooks.hooks[key] = hook
-	case PromiseChained:
+	case OnChained:
 		el.hooks.chainedHookKeys = append(el.hooks.chainedHookKeys, key)
 		el.hooks.hooks[key] = hook
-	case PromiseFulfilled:
+	case OnFulfilled:
 		el.hooks.fulfilledHookKeys = append(el.hooks.fulfilledHookKeys, key)
 		el.hooks.hooks[key] = hook
-	case PromiseRejected:
+	case OnRejected:
 		el.hooks.rejectedHookKeys = append(el.hooks.rejectedHookKeys, key)
 		el.hooks.hooks[key] = hook
-	case PromiseSettled:
+	case OnSettled:
 		el.hooks.settledHookKeys = append(el.hooks.settledHookKeys, key)
 		el.hooks.hooks[key] = hook
 	}
@@ -111,11 +99,7 @@ func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 	return key
 }
 
-/*
-Off 移除一个 Promise 钩子函数。
-  - event: 钩子事件类型，可选值为 [PromiseCreated]/[PromiseChained]/[PromiseFulfilled]/[PromiseRejected]/[PromiseSettled]。
-  - key: 要移除的钩子函数的唯一标识，由 On 方法返回。
-*/
+// Off [EventLoop.Off]
 func (el *eventLoopImpl) Off(event HookType, key string) {
 	if key == "" {
 		return
@@ -127,15 +111,15 @@ func (el *eventLoopImpl) Off(event HookType, key string) {
 	var targetSlice *[]string
 
 	switch event {
-	case PromiseCreated:
+	case OnCreated:
 		targetSlice = &el.hooks.createdHookKeys
-	case PromiseChained:
+	case OnChained:
 		targetSlice = &el.hooks.chainedHookKeys
-	case PromiseFulfilled:
+	case OnFulfilled:
 		targetSlice = &el.hooks.fulfilledHookKeys
-	case PromiseRejected:
+	case OnRejected:
 		targetSlice = &el.hooks.rejectedHookKeys
-	case PromiseSettled:
+	case OnSettled:
 		targetSlice = &el.hooks.settledHookKeys
 	}
 
@@ -144,6 +128,7 @@ func (el *eventLoopImpl) Off(event HookType, key string) {
 	}
 }
 
+// 获取一个指定长度的随机字符串
 func randString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
@@ -153,6 +138,7 @@ func randString(length int) string {
 	return "@" + string(result)
 }
 
+// 从 slice 中删除内容为 key 的元素
 func deleteFromSlice(slice *[]string, key string) bool {
 	target := false
 	for i, k := range *slice {

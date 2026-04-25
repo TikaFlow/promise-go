@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// 时间线类型，用于调度宏任务
 type timeLine struct {
 	nextID    int
 	idLock    sync.Mutex
@@ -15,6 +16,7 @@ type timeLine struct {
 	eventLoop *eventLoopImpl
 }
 
+// 定时任务类型
 type timedTask struct {
 	id       int
 	deadline time.Time
@@ -23,10 +25,12 @@ type timedTask struct {
 	repeat   bool
 }
 
+// 将任务推送到宏任务队列
 func (tl *timeLine) queueMacrotask(fn func()) {
 	tl.eventLoop.macrotaskQueue <- fn
 }
 
+// 重置定时器，参数是到期时间
 func (tl *timeLine) resetTimer(t time.Duration) {
 	if !tl.timer.Stop() {
 		select {
@@ -38,6 +42,7 @@ func (tl *timeLine) resetTimer(t time.Duration) {
 	tl.timer.Reset(t)
 }
 
+// 添加一个待调度的任务
 func (tl *timeLine) appendTask(task *timedTask) {
 	if len(tl.tasks) == 0 {
 		tl.tasks = append(tl.tasks, task)
@@ -64,6 +69,7 @@ func (tl *timeLine) appendTask(task *timedTask) {
 	}
 }
 
+// 移除一个待调度的任务
 func (tl *timeLine) removeTask(id int) {
 	if id == -1 {
 		return
@@ -81,6 +87,7 @@ func (tl *timeLine) removeTask(id int) {
 	}
 }
 
+// 构造一个定时任务并添加到调度队列
 func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int {
 	if callback == nil {
 		return -1
@@ -106,6 +113,7 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 	return id
 }
 
+// 消费任务，即把到达调度时间的任务推送到宏任务队列
 func (tl *timeLine) consumeTask() {
 	called := false
 	for len(tl.tasks) > 0 && !tl.tasks[0].deadline.After(time.Now()) {
@@ -126,13 +134,7 @@ func (tl *timeLine) consumeTask() {
 	}
 }
 
-/*
-SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数。
-  - callback 回调函数
-  - millis 延迟执行的毫秒数，具有最低延迟限制：1ms
-
-返回一个定时器 ID，可通过调用 ClearTimeout 函数来清除定时器。
-*/
+// SetTimeout [EventLoop.SetTimeout]
 func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
 	if callback == nil {
 		return -1
@@ -140,13 +142,7 @@ func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
 	return el.timeline.produceTask(callback, millis, false)
 }
 
-/*
-SetInterval 模拟 setInterval 函数，在指定毫秒数后重复调用回调函数。
-  - callback 回调函数
-  - millis 延迟执行的毫秒数，具有最低延迟限制：1ms
-
-返回一个定时器 ID，可通过调用 ClearInterval 函数来清除定时器。
-*/
+// SetInterval [EventLoop.SetInterval]
 func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
 	if callback == nil {
 		return -1
@@ -154,10 +150,7 @@ func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
 	return el.timeline.produceTask(callback, millis, true)
 }
 
-/*
-ClearTimeout 清除由 SetTimeout 函数创建的定时器。
-  - id 定时器ID
-*/
+// ClearTimeout [EventLoop.ClearTimeout]
 func (el *eventLoopImpl) ClearTimeout(id int) {
 	if id == -1 {
 		return
@@ -165,10 +158,7 @@ func (el *eventLoopImpl) ClearTimeout(id int) {
 	el.timeline.clearCh <- id
 }
 
-/*
-ClearInterval 清除由 SetInterval 函数创建的定时器。
-  - id 定时器ID
-*/
+// ClearInterval [EventLoop.ClearInterval]
 func (el *eventLoopImpl) ClearInterval(id int) {
 	if id == -1 {
 		return
@@ -176,6 +166,7 @@ func (el *eventLoopImpl) ClearInterval(id int) {
 	el.timeline.clearCh <- id
 }
 
+// 调度器主逻辑
 func (tl *timeLine) run() {
 	for {
 		select {
