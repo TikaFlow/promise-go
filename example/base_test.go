@@ -101,10 +101,11 @@ func Example_macroTask() {
 func Example_asyncAwait() {
 	el := promise.StartEventLoop(1)
 	defer el.Stop()
-	el.Async(func() {
+	el.Async(func() (any, error) {
 		// 模拟耗时任务
 		time.Sleep(time.Millisecond * 100)
 		fmt.Println("Macrotask 1")
+		return nil, nil
 	})
 
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
