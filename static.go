@@ -123,15 +123,19 @@ func (el *eventLoopImpl) Any(inputs ...any) Promise {
 }
 
 // Async [EventLoop.Async]
-func (el *eventLoopImpl) Async(fn func()) Promise {
+func (el *eventLoopImpl) Async(fn func() (any, error)) Promise {
 	if fn == nil {
 		return el.Reject(NewTypeError("fn must be a function"))
 	}
 
-	return el.NewPromise(func(resolve, reject func(v any)) error {
+	return el.NewPromise(func(resolve, reject func(any)) error {
 		task := func() {
-			fn()
-			resolve(nil)
+			v, err := fn()
+			if err != nil {
+				reject(err)
+				return
+			}
+			resolve(v)
 		}
 		el.pushTask(task)
 		return nil

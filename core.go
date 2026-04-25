@@ -149,10 +149,11 @@ type EventLoop interface {
 	//
 	// 类似于 `go fn()`，但会在一个专用的 worker-pool 中进行，且能获取返回值
 	//
-	// [todo] [fixme] 返回值、异常，应修复
-	// 返回一个 [Promise] 实例，并在 fn 函数执行完成后变为解决状态，解决值是 fn 的返回值
+	// # return
+	//
+	// 一个新的 [Promise] 实例，并在 fn 函数执行完成后变为解决状态，解决值是 fn 的返回值
 	// 若 fn 函数抛出异常 err，则 [Promise] 实例会被拒绝，且拒绝理由为 err
-	Async(fn func()) Promise
+	Async(fn func() (any, error)) Promise
 
 	// Await 等待 Promise 完成并获取解决值，可设定超时时间，以免无限等待
 	//   - prom 需要等待的 [Promise] 实例，如果不是 [Promise] 实例，则会被直接返回
@@ -222,8 +223,10 @@ type EventLoop interface {
 	//
 	// event 与 key 必须匹配，否则将解绑失败
 	//
-	// [todo] 返回bool以表明解绑是否成功
-	Off(event HookType, key string)
+	// # return
+	//
+	// 表明解绑是否成功的 bool 值
+	Off(event HookType, key string) bool
 
 	// PromiseWithResolvers 创建一个新的 [Promise] 实例，同时返回 resolve 和 reject 函数，
 	// 对应于传入给 Promise() 构造函数执行器的两个参数

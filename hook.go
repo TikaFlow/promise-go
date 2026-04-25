@@ -100,9 +100,9 @@ func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 }
 
 // Off [EventLoop.Off]
-func (el *eventLoopImpl) Off(event HookType, key string) {
+func (el *eventLoopImpl) Off(event HookType, key string) bool {
 	if key == "" {
-		return
+		return false
 	}
 
 	el.hooks.hooksLock.Lock()
@@ -123,9 +123,15 @@ func (el *eventLoopImpl) Off(event HookType, key string) {
 		targetSlice = &el.hooks.settledHookKeys
 	}
 
-	if targetSlice != nil && deleteFromSlice(targetSlice, key) {
-		delete(el.hooks.hooks, key)
+	if targetSlice == nil {
+		return false
 	}
+	if deleteFromSlice(targetSlice, key) {
+		delete(el.hooks.hooks, key)
+		return true
+	}
+
+	return false
 }
 
 // 获取一个指定长度的随机字符串
