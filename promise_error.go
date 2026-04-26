@@ -12,7 +12,7 @@ func (e *TypeError) Error() string {
 	return "TypeError: " + e.text
 }
 
-func NewTypeError(text string) *TypeError {
+func NewTypeError(text string) error {
 	return &TypeError{text: text}
 }
 
@@ -26,7 +26,7 @@ func (e *RangeError) Error() string {
 	return "RangeError: " + e.text
 }
 
-func NewRangeError(text string) *RangeError {
+func NewRangeError(text string) error {
 	return &RangeError{text: text}
 }
 
@@ -40,7 +40,7 @@ func (e *TimeoutError) Error() string {
 	return "TimeoutError: " + e.text
 }
 
-func NewTimeoutError(text string) *TimeoutError {
+func NewTimeoutError(text string) error {
 	return &TimeoutError{text: text}
 }
 
@@ -60,7 +60,7 @@ func (e *AggregateError) Unwrap() []error {
 	return e.errors
 }
 
-func NewAggregateError(errors []error, stack string, message string) *AggregateError {
+func NewAggregateError(errors []error, stack string, message string) error {
 	return &AggregateError{
 		errors:  errors,
 		stack:   stack,
@@ -78,6 +78,6 @@ func (e *UnexpectedError) Error() string {
 	return "UnexpectedError: " + fmt.Sprintf("%v", e.reason)
 }
 
-func NewUnexpectedError(reason any) *UnexpectedError {
+func NewUnexpectedError(reason any) error {
 	return &UnexpectedError{reason: reason}
 }
