@@ -343,6 +343,42 @@ func TestEachOneFailure(t *testing.T) {
 		})
 }
 
+// 测试Each方法 - 迭代器返回promise
+func TestEachIteratorReturnsPromise(t *testing.T) {
+	t.Parallel()
+	el.Each(func(item any, index int, arrLen int) any {
+		return el.Resolve(item.(int) * 2)
+	}, 1, 2, 3).
+		Then(func(v any) (any, error) {
+			arr := v.([]any)
+			if len(arr) != 3 {
+				t.Errorf("Expected array length 3, got %d", len(arr))
+			}
+			if arr[0] != 1 || arr[1] != 2 || arr[2] != 3 {
+				t.Errorf("Expected [1, 2, 3], got %v", arr)
+			}
+			return nil, nil
+		}, nil)
+
+	time.Sleep(time.Second)
+}
+
+// 测试Each方法 - 空数组
+func TestEachEmptyArray(t *testing.T) {
+	t.Parallel()
+	el.Each(func(item any, index int, arrLen int) any {
+		return item
+	}).
+		Then(func(v any) (any, error) {
+			if len(v.([]any)) != 0 {
+				t.Errorf("Expected empty array, got %v", v)
+			}
+			return nil, nil
+		}, nil)
+
+	time.Sleep(time.Second)
+}
+
 // 测试Filter方法 - 全部成功
 func TestFilterAllResolved(t *testing.T) {
 	t.Parallel()
@@ -388,6 +424,23 @@ func TestFilterOneRejected(t *testing.T) {
 			}
 			return nil, nil
 		})
+}
+
+// 测试Filter方法 - 空数组
+func TestFilterEmptyArray(t *testing.T) {
+	t.Parallel()
+	filter := func(item any) bool {
+		return true
+	}
+	el.Filter(filter).
+		Then(func(v any) (any, error) {
+			if len(v.([]any)) != 0 {
+				t.Errorf("Expected empty array, got %v", v)
+			}
+			return nil, nil
+		}, nil)
+
+	time.Sleep(time.Second)
 }
 
 // 测试Map方法 - 全部成功

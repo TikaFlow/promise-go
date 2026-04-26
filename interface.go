@@ -148,7 +148,7 @@ type EventLoop interface {
 	//   - 新 [Promise] 会在所有 [Promise] 已决后解决，解决值为一个包含所有 [Promise] 完成状态和结果的数组
 	AllSettled(inputs ...any) Promise
 
-	// Any 等待 inputs 中第一个成功解决的元素
+	// Any 等待 inputs 中第一个解决的元素
 	//   - 如果任何一个 [Promise] 解决，新 [Promise] 也会被解决，且解决值为第一个被解决的解决值
 	//   - 如果所有 [Promise] 都被拒绝，新 [Promise] 也会被拒绝，且拒绝理由为 [AggregateError]，
 	//     其包含所有 [Promise] 拒绝理由的数组，顺序为 [Promise] 数组中的顺序
@@ -164,7 +164,7 @@ type EventLoop interface {
 	// 若 fn 函数抛出异常 err，则 [Promise] 实例会被拒绝，且拒绝理由为 err
 	Async(fn func() (any, error)) Promise
 
-	// Await 等待 Promise 完成并获取解决值，可设定超时时间，以免无限等待
+	// Await 等待 Promise 已决并获取解决值，可设定超时时间，以免无限等待
 	//   - prom 需要等待的 [Promise] 实例，如果不是 [Promise] 实例，则会被直接返回
 	//   - timeout 超时时间，单位为毫秒
 	//

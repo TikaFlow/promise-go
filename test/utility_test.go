@@ -118,6 +118,20 @@ func TestDelay(t *testing.T) {
 	time.Sleep(time.Second)
 }
 
+// 测试Delay函数 - 已拒绝的promise
+func TestDelayRejectedPromise(t *testing.T) {
+	t.Parallel()
+	rejected := el.Reject("rejected reason")
+	p := el.Delay(rejected, 50)
+
+	_, err := el.Await(p, 100)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	} else if err.Error() != "UnexpectedError: rejected reason" {
+		t.Errorf("Expected 'UnexpectedError: rejected reason', got %v", err)
+	}
+}
+
 // 测试PromiseWithResolvers方法
 func TestPromiseWithResolvers(t *testing.T) {
 	t.Parallel()
@@ -194,4 +208,56 @@ func TestTrySuccess(t *testing.T) {
 		t.Errorf("Promise.Try should be fulfilled, but was rejected with %v", v.Error())
 		return nil, nil
 	})
+}
+
+// 测试Async方法 - 正常返回
+func TestAsyncSuccess(t *testing.T) {
+	t.Parallel()
+	p := el.Async(func() (any, error) {
+		time.Sleep(time.Millisecond * 50)
+		return "async result", nil
+	})
+
+	res, err := el.Await(p, 100)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if res != "async result" {
+		t.Errorf("Expected 'async result', got %v", res)
+	}
+}
+
+// 测试Async方法 - 报错
+func TestAsyncError(t *testing.T) {
+	t.Parallel()
+	p := el.Async(func() (any, error) {
+		time.Sleep(time.Millisecond * 50)
+		return nil, errors.New("async error")
+	})
+
+	_, err := el.Await(p, 100)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	} else if err.Error() != "async error" {
+		t.Errorf("Expected 'async error', got %v", err)
+	}
+}
+
+// 测试Async方法 - 返回promise
+func TestAsyncReturnsPromise(t *testing.T) {
+	t.Parallel()
+	p := el.Async(func() (any, error) {
+		return el.NewPromise(func(resolve, reject func(v any)) error {
+			resolve("async promise")
+			return nil
+		}), nil
+	})
+
+	res, err := el.Await(p, 100)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if res != "async promise" {
+		t.Errorf("Expected 'async promise', got %v", res)
+	}
 }

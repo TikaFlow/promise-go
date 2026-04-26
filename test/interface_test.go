@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	. "github.com/TikaFlow/promise-go"
 )
 
 // 测试Catch方法
@@ -316,4 +318,108 @@ func TestThenPassThroughRejected(t *testing.T) {
 		}
 		return nil, nil
 	})
+}
+
+// 测试State方法
+func TestState(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		return nil
+	})
+	p2 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("value")
+		return nil
+	})
+	p3 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+
+	time.Sleep(time.Second)
+	if p1.State() != Pending {
+		t.Errorf("Expected state Pending, got %s", p1.State())
+	}
+	if p2.State() != Fulfilled {
+		t.Errorf("Expected state Fulfilled, got %s", p2.State())
+	}
+	if p3.State() != Rejected {
+		t.Errorf("Expected state Rejected, got %s", p3.State())
+	}
+}
+
+// 测试Value方法
+func TestValue(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		return nil
+	})
+	p2 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("success")
+		return nil
+	})
+	p3 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+
+	if p1.Value() != nil {
+		t.Errorf("Expected Value() to be nil for Pending promise, got %v", p1.Value())
+	}
+	if p2.Value() != "success" {
+		t.Errorf("Expected Value() to be 'success', got %v", p2.Value())
+	}
+	if p3.Value() != nil {
+		t.Errorf("Expected Value() to be nil for Rejected promise, got %v", p3.Value())
+	}
+}
+
+// 测试Reason方法
+func TestReason(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		return nil
+	})
+	p2 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("success")
+		return nil
+	})
+	p3 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+
+	if p1.Reason() != nil {
+		t.Errorf("Expected Reason() to be nil for Pending promise, got %v", p1.Reason())
+	}
+	if p2.Reason() != nil {
+		t.Errorf("Expected Reason() to be nil for Fulfilled promise, got %v", p2.Reason())
+	}
+	if p3.Reason() == nil || p3.Reason().Error() != "UnexpectedError: error" {
+		t.Errorf("Expected Reason() to be 'UnexpectedError: error', got %v", p3.Reason())
+	}
+}
+
+// 测试Done方法
+func TestDone(t *testing.T) {
+	t.Parallel()
+	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
+		return nil
+	})
+	select {
+	case <-p1.Done():
+		t.Errorf("Expected Done() to block for Pending promise")
+	default:
+	}
+
+	p2 := el.NewPromise(func(resolve, reject func(v any)) error {
+		resolve("success")
+		return nil
+	})
+	<-p2.Done()
+
+	p3 := el.NewPromise(func(resolve, reject func(v any)) error {
+		reject("error")
+		return nil
+	})
+	<-p3.Done()
 }
