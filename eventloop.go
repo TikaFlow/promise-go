@@ -2,7 +2,70 @@ package promise
 
 import (
 	"sync/atomic"
+
+	pool "github.com/TikaFlow/worker-pool"
 )
+
+// 事件循环的内部实现
+type eventLoopImpl struct {
+	EventLoop
+	microtaskQueue chan func()
+	macrotaskQueue chan func()
+	looper         pool.Pool
+	scheduler      pool.Pool
+	worker         pool.Pool
+	timeline       *timeLine
+	hooks          *promiseHooks
+	done           chan struct{}
+}
+
+// 执行所有任务队列中的任务
+func (el *eventLoopImpl) flushTasks() {
+	for _, task := range el.timeline.tasks {
+		el.timeline.queueMacrotask(task.callback)
+	}
+	close(el.macrotaskQueue)
+	close(el.microtaskQueue)
+	for task := range el.microtaskQueue {
+		task()
+	}
+	for task := range el.macrotaskQueue {
+		task()
+	}
+}
+
+// 事件循环：清空微队列 -> 执行一个宏任务（如有） -> 清空微队列 ...
+func (el *eventLoopImpl) run() {
+	for {
+		select {
+		case task := <-el.microtaskQueue:
+			task()
+		case <-el.done:
+			return
+		default:
+			select {
+			case task := <-el.macrotaskQueue:
+				task()
+			case <-el.done:
+				return
+			default:
+				select {
+				case task := <-el.microtaskQueue:
+					task()
+				case task := <-el.macrotaskQueue:
+					task()
+				case <-el.done:
+					return
+				}
+			}
+		}
+	}
+}
+
+// 将一个异步任务添加到工作池
+func (el *eventLoopImpl) pushTask(fn func()) {
+	el.worker.Add(fn)
+}
 
 // All [EventLoop.All]
 func (el *eventLoopImpl) All(inputs ...any) Promise {
@@ -178,6 +241,38 @@ func (el *eventLoopImpl) Await(prom any, timeout int64) (v any, err error) {
 	return
 }
 
+// ClearInterval [EventLoop.ClearInterval]
+func (el *eventLoopImpl) ClearInterval(id int) {
+	if id == -1 {
+		return
+	}
+	el.timeline.clearCh <- id
+}
+
+// ClearTimeout [EventLoop.ClearTimeout]
+func (el *eventLoopImpl) ClearTimeout(id int) {
+	if id == -1 {
+		return
+	}
+	el.timeline.clearCh <- id
+}
+
+// Delay [EventLoop.Delay]
+func (el *eventLoopImpl) Delay(prom any, millis int64) Promise {
+	return el.NewPromise(func(resolve, reject func(v any)) error {
+		el.Resolve(prom).Then(func(v2 any) (any, error) {
+			el.SetTimeout(func() {
+				resolve(v2)
+			}, millis)
+			return nil, nil
+		}, func(r error) (any, error) {
+			reject(r)
+			return nil, nil
+		})
+		return nil
+	})
+}
+
 // Each [EventLoop.Each]
 func (el *eventLoopImpl) Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	if inputs == nil {
@@ -208,22 +303,6 @@ func (el *eventLoopImpl) Each(it func(item any, index int, arrLen int) any, inpu
 		Then(func(any) (any, error) {
 			return result, nil
 		}, nil)
-}
-
-// Delay [EventLoop.Delay]
-func (el *eventLoopImpl) Delay(prom any, millis int64) Promise {
-	return el.NewPromise(func(resolve, reject func(v any)) error {
-		el.Resolve(prom).Then(func(v2 any) (any, error) {
-			el.SetTimeout(func() {
-				resolve(v2)
-			}, millis)
-			return nil, nil
-		}, func(r error) (any, error) {
-			reject(r)
-			return nil, nil
-		})
-		return nil
-	})
 }
 
 // Filter [EventLoop.Filter]
@@ -266,6 +345,111 @@ func (el *eventLoopImpl) Map(mapper func(item any) any, inputs ...any) Promise {
 	return el.All(result...)
 }
 
+// NewPromise [EventLoop.NewPromise]
+func (el *eventLoopImpl) NewPromise(exec Executor) Promise {
+	if exec == nil {
+		panic("Promise executor must be a function")
+	}
+
+	prom := &promiseImpl{
+		value:           nil,
+		reason:          nil,
+		state:           Pending,
+		settledHandlers: make(chan *handler, 128),
+		settled:         make(chan struct{}),
+		eventLoop:       el,
+	}
+	el.hooks.callHooks(OnCreated, prom)
+
+	res := func(data any) {
+		prom.resolved.Do(func() {
+			resolvePromise(prom, data)
+		})
+	}
+	rej := func(reason any) {
+		prom.resolved.Do(func() {
+			rejectPromise(prom, reason)
+		})
+	}
+
+	if err := exec(res, rej); err != nil {
+		rej(err)
+	}
+	return prom
+}
+
+// Off [EventLoop.Off]
+func (el *eventLoopImpl) Off(event HookType, key string) bool {
+	if key == "" {
+		return false
+	}
+
+	el.hooks.hooksLock.Lock()
+	defer el.hooks.hooksLock.Unlock()
+
+	var targetSlice *[]string
+
+	switch event {
+	case OnCreated:
+		targetSlice = &el.hooks.createdHookKeys
+	case OnChained:
+		targetSlice = &el.hooks.chainedHookKeys
+	case OnFulfilled:
+		targetSlice = &el.hooks.fulfilledHookKeys
+	case OnRejected:
+		targetSlice = &el.hooks.rejectedHookKeys
+	case OnSettled:
+		targetSlice = &el.hooks.settledHookKeys
+	}
+
+	if targetSlice == nil {
+		return false
+	}
+	if deleteFromSlice(targetSlice, key) {
+		delete(el.hooks.hooks, key)
+		return true
+	}
+
+	return false
+}
+
+// On [EventLoop.On]
+func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
+	if hook == nil {
+		return ""
+	}
+
+	el.hooks.hooksLock.Lock()
+	defer el.hooks.hooksLock.Unlock()
+
+	var exist = true
+	var key string
+	for exist {
+		key = string(event) + randString(16)
+		_, exist = el.hooks.hooks[key]
+	}
+
+	switch event {
+	case OnCreated:
+		el.hooks.createdHookKeys = append(el.hooks.createdHookKeys, key)
+		el.hooks.hooks[key] = hook
+	case OnChained:
+		el.hooks.chainedHookKeys = append(el.hooks.chainedHookKeys, key)
+		el.hooks.hooks[key] = hook
+	case OnFulfilled:
+		el.hooks.fulfilledHookKeys = append(el.hooks.fulfilledHookKeys, key)
+		el.hooks.hooks[key] = hook
+	case OnRejected:
+		el.hooks.rejectedHookKeys = append(el.hooks.rejectedHookKeys, key)
+		el.hooks.hooks[key] = hook
+	case OnSettled:
+		el.hooks.settledHookKeys = append(el.hooks.settledHookKeys, key)
+		el.hooks.hooks[key] = hook
+	}
+
+	return key
+}
+
 // PromiseWithResolvers [EventLoop.PromiseWithResolvers]
 func (el *eventLoopImpl) PromiseWithResolvers() (Promise, func(any), func(any)) {
 	var resolve, reject func(any)
@@ -275,6 +459,14 @@ func (el *eventLoopImpl) PromiseWithResolvers() (Promise, func(any), func(any)) 
 		return nil
 	})
 	return p, resolve, reject
+}
+
+// QueueMicrotask [EventLoop.QueueMicrotask]
+func (el *eventLoopImpl) QueueMicrotask(fn func()) {
+	if fn == nil {
+		return
+	}
+	el.microtaskQueue <- fn
 }
 
 // Race [EventLoop.Race]
@@ -349,6 +541,22 @@ func (el *eventLoopImpl) Resolve(value any) Promise {
 	})
 }
 
+// SetInterval [EventLoop.SetInterval]
+func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
+	if callback == nil {
+		return -1
+	}
+	return el.timeline.produceTask(callback, millis, true)
+}
+
+// SetTimeout [EventLoop.SetTimeout]
+func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
+	if callback == nil {
+		return -1
+	}
+	return el.timeline.produceTask(callback, millis, false)
+}
+
 // Some [EventLoop.Some]
 func (el *eventLoopImpl) Some(num int, inputs ...any) Promise {
 	if inputs == nil {
@@ -391,6 +599,15 @@ func (el *eventLoopImpl) Some(num int, inputs ...any) Promise {
 		}
 		return nil
 	})
+}
+
+// Stop [EventLoop.Stop]
+func (el *eventLoopImpl) Stop() {
+	el.flushTasks()
+	close(el.done)
+	_ = el.looper.Close()
+	_ = el.scheduler.Close()
+	_ = el.worker.Close()
 }
 
 // Try [EventLoop.Try]

@@ -134,38 +134,6 @@ func (tl *timeLine) consumeTask() {
 	}
 }
 
-// SetTimeout [EventLoop.SetTimeout]
-func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
-	if callback == nil {
-		return -1
-	}
-	return el.timeline.produceTask(callback, millis, false)
-}
-
-// SetInterval [EventLoop.SetInterval]
-func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
-	if callback == nil {
-		return -1
-	}
-	return el.timeline.produceTask(callback, millis, true)
-}
-
-// ClearTimeout [EventLoop.ClearTimeout]
-func (el *eventLoopImpl) ClearTimeout(id int) {
-	if id == -1 {
-		return
-	}
-	el.timeline.clearCh <- id
-}
-
-// ClearInterval [EventLoop.ClearInterval]
-func (el *eventLoopImpl) ClearInterval(id int) {
-	if id == -1 {
-		return
-	}
-	el.timeline.clearCh <- id
-}
-
 // 调度器主逻辑
 func (tl *timeLine) run() {
 	for {

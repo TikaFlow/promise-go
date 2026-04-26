@@ -1,7 +1,6 @@
 package promise
 
 import (
-	"math/rand"
 	"sync"
 )
 
@@ -60,99 +59,4 @@ func (hk *promiseHooks) callHooks(event HookType, p Promise) {
 	case OnSettled:
 		hk.callHook(hk.settledHookKeys, p)
 	}
-}
-
-// On [EventLoop.On]
-func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
-	if hook == nil {
-		return ""
-	}
-
-	el.hooks.hooksLock.Lock()
-	defer el.hooks.hooksLock.Unlock()
-
-	var exist = true
-	var key string
-	for exist {
-		key = string(event) + randString(16)
-		_, exist = el.hooks.hooks[key]
-	}
-
-	switch event {
-	case OnCreated:
-		el.hooks.createdHookKeys = append(el.hooks.createdHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnChained:
-		el.hooks.chainedHookKeys = append(el.hooks.chainedHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnFulfilled:
-		el.hooks.fulfilledHookKeys = append(el.hooks.fulfilledHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnRejected:
-		el.hooks.rejectedHookKeys = append(el.hooks.rejectedHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnSettled:
-		el.hooks.settledHookKeys = append(el.hooks.settledHookKeys, key)
-		el.hooks.hooks[key] = hook
-	}
-
-	return key
-}
-
-// Off [EventLoop.Off]
-func (el *eventLoopImpl) Off(event HookType, key string) bool {
-	if key == "" {
-		return false
-	}
-
-	el.hooks.hooksLock.Lock()
-	defer el.hooks.hooksLock.Unlock()
-
-	var targetSlice *[]string
-
-	switch event {
-	case OnCreated:
-		targetSlice = &el.hooks.createdHookKeys
-	case OnChained:
-		targetSlice = &el.hooks.chainedHookKeys
-	case OnFulfilled:
-		targetSlice = &el.hooks.fulfilledHookKeys
-	case OnRejected:
-		targetSlice = &el.hooks.rejectedHookKeys
-	case OnSettled:
-		targetSlice = &el.hooks.settledHookKeys
-	}
-
-	if targetSlice == nil {
-		return false
-	}
-	if deleteFromSlice(targetSlice, key) {
-		delete(el.hooks.hooks, key)
-		return true
-	}
-
-	return false
-}
-
-// 获取一个指定长度的随机字符串
-func randString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
-	}
-	return "@" + string(result)
-}
-
-// 从 slice 中删除内容为 key 的元素
-func deleteFromSlice(slice *[]string, key string) bool {
-	target := false
-	for i, k := range *slice {
-		if k == key {
-			target = true
-			*slice = append((*slice)[:i], (*slice)[i+1:]...)
-			break
-		}
-	}
-	return target
 }
