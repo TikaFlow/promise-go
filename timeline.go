@@ -13,7 +13,7 @@ type timeLine struct {
 	timer     *time.Timer
 	taskCh    chan *timedTask
 	clearCh   chan int
-	eventLoop *eventLoopImpl
+	eventLoop *EventLoop
 }
 
 // 定时任务类型

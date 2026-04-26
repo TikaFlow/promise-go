@@ -3,7 +3,7 @@ package promise
 import "math/rand"
 
 // 解决一个 [Promise]
-func resolvePromise(prom *promiseImpl, value any) {
+func resolvePromise(prom *Promise, value any) {
 	if prom == nil {
 		return
 	}
@@ -19,7 +19,7 @@ func resolvePromise(prom *promiseImpl, value any) {
 	}
 
 	// 2.3.2
-	if x, ok := value.(Promise); ok {
+	if x, ok := value.(*Promise); ok {
 		// 2.3.2 如果已决值是 Promise 对象，则采用其状态
 		prom.eventLoop.QueueMicrotask(func() {
 			x.Then(func(v any) (any, error) {
@@ -46,7 +46,7 @@ func resolvePromise(prom *promiseImpl, value any) {
 }
 
 // 拒绝一个 [Promise]
-func rejectPromise(prom *promiseImpl, r any) {
+func rejectPromise(prom *Promise, r any) {
 	if prom == nil {
 		return
 	}
@@ -71,7 +71,7 @@ func rejectPromise(prom *promiseImpl, r any) {
 }
 
 // 调用 [Promise] 的回调函数
-func flushHandlers(cur *promiseImpl) {
+func flushHandlers(cur *Promise) {
 	// 2.2.6 then 可以注册多次，且会按照注册顺序执行
 	for {
 		select {

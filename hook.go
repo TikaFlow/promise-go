@@ -31,19 +31,19 @@ type promiseHooks struct {
 	fulfilledHookKeys []string
 	rejectedHookKeys  []string
 	settledHookKeys   []string
-	hooks             map[string]func(p Promise)
+	hooks             map[string]func(p *Promise)
 	hooksLock         sync.RWMutex
 }
 
 // 调用具体钩子
-func (hk *promiseHooks) callHook(slice []string, p Promise) {
+func (hk *promiseHooks) callHook(slice []string, p *Promise) {
 	for _, key := range slice {
 		hk.hooks[key](p)
 	}
 }
 
 // 通过钩子类型调用钩子
-func (hk *promiseHooks) callHooks(event HookType, p Promise) {
+func (hk *promiseHooks) callHooks(event HookType, p *Promise) {
 	hk.hooksLock.RLock()
 	defer hk.hooksLock.RUnlock()
 

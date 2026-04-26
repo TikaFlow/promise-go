@@ -54,7 +54,7 @@ func TestCycleDetection(t *testing.T) {
 		return nil
 	})
 
-	var p Promise
+	var p *Promise
 	p = initial.Then(func(any) (any, error) {
 		return p, nil
 	}, nil)

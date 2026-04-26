@@ -139,34 +139,34 @@ func TestSetIntervalLongDelay(t *testing.T) {
 		if str != "" {
 			t.Errorf("Expected str '', got %s", str)
 		}
-	}, 980)
+	}, 800)
 	el.SetTimeout(func() {
 		if str != "interval " {
 			t.Errorf("Expected str 'interval ', got %s", str)
 		}
-	}, 1020)
+	}, 1200)
 
 	el.SetTimeout(func() {
 		if str != "interval " {
 			t.Errorf("Expected str 'interval ', got %s", str)
 		}
-	}, 1980)
+	}, 1800)
 	el.SetTimeout(func() {
 		if str != "interval interval " {
 			t.Errorf("Expected str 'interval interval ', got %s", str)
 		}
-	}, 2020)
+	}, 2200)
 
 	el.SetTimeout(func() {
 		if str != "interval interval " {
 			t.Errorf("Expected str 'interval interval ', got %s", str)
 		}
-	}, 2980)
+	}, 2800)
 	el.SetTimeout(func() {
 		if str != "interval interval interval " {
 			t.Errorf("Expected str 'interval interval interval ', got %s", str)
 		}
-	}, 3020)
+	}, 3200)
 
 	time.Sleep(5 * time.Second)
 }

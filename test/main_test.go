@@ -7,7 +7,7 @@ import (
 	. "github.com/TikaFlow/promise-go"
 )
 
-var el EventLoop
+var el *EventLoop
 
 func TestMain(m *testing.M) {
 	el = StartEventLoop(10)
