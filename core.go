@@ -8,7 +8,7 @@ import (
 
 // StartEventLoop 启动一个事件循环
 //
-// 事件循环会持续运行，直到调用 [EventLoop.Stop] 方法关闭
+// 事件循环会持续运行，直到调用 [DocEventLoop.Stop] 方法关闭
 //   - workerCount: 工作线程数量
 func StartEventLoop(workerCount int) EventLoop {
 	el := &eventLoopImpl{

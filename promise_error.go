@@ -30,7 +30,7 @@ func NewRangeError(text string) error {
 	return &RangeError{text: text}
 }
 
-// TimeoutError 超时错误，用于 [EventLoop.Await] 函数等待超时的情况
+// TimeoutError 超时错误，用于 [DocEventLoop.Await] 函数等待超时的情况
 type TimeoutError struct {
 	error
 	text string

@@ -67,7 +67,9 @@ func (el *eventLoopImpl) pushTask(fn func()) {
 	el.worker.Add(fn)
 }
 
-// All [EventLoop.All]
+// All 等待所有输入解决
+//   - 如果 inputs 的所有元素都成功解决，新 [Promise] 也会成功解决，且解决值为一个包含所有元素解决值的数组
+//   - 如果任何一个元素被拒绝，新 [Promise] 也会被拒绝，且拒绝理由为第一个被拒绝的元素的拒绝理由
 func (el *eventLoopImpl) All(inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -98,7 +100,8 @@ func (el *eventLoopImpl) All(inputs ...any) Promise {
 	})
 }
 
-// AllSettled [EventLoop.AllSettled]
+// AllSettled 等待所有 [Promise] 已决（解决或拒绝）
+//   - 新 [Promise] 会在所有 [Promise] 已决后解决，解决值为一个包含所有 [Promise] 完成状态和结果的数组
 func (el *eventLoopImpl) AllSettled(inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -151,7 +154,10 @@ func (el *eventLoopImpl) AllSettled(inputs ...any) Promise {
 	})
 }
 
-// Any [EventLoop.Any]
+// Any 等待 inputs 中第一个解决的元素
+//   - 如果任何一个 [Promise] 解决，新 [Promise] 也会被解决，且解决值为第一个被解决的解决值
+//   - 如果所有 [Promise] 都被拒绝，新 [Promise] 也会被拒绝，且拒绝理由为 [AggregateError]，
+//     其包含所有 [Promise] 拒绝理由的数组，顺序为 [Promise] 数组中的顺序
 func (el *eventLoopImpl) Any(inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -185,7 +191,14 @@ func (el *eventLoopImpl) Any(inputs ...any) Promise {
 	})
 }
 
-// Async [EventLoop.Async]
+// Async 将 fn 作为一个异步任务执行
+//
+// 类似于 `go fn()`，但会在一个专用的 worker-pool 中进行，且能获取返回值
+//
+// # return
+//
+// 一个新的 [Promise] 实例，并在 fn 函数执行完成后变为解决状态，解决值是 fn 的返回值
+// 若 fn 函数抛出异常 err，则 [Promise] 实例会被拒绝，且拒绝理由为 err
 func (el *eventLoopImpl) Async(fn func() (any, error)) Promise {
 	if fn == nil {
 		return el.Reject(NewTypeError("fn must be a function"))
@@ -205,7 +218,14 @@ func (el *eventLoopImpl) Async(fn func() (any, error)) Promise {
 	})
 }
 
-// Await [EventLoop.Await]
+// Await 等待 Promise 已决并获取解决值，可设定超时时间，以免无限等待
+//   - prom 需要等待的 [Promise] 实例，如果不是 [Promise] 实例，则会被直接返回
+//   - timeout 超时时间，单位为毫秒
+//
+// # return
+//
+//   - v 目标 prom 的解决值
+//   - err 拒绝理由，当 err 存在时，代表 [Promise] 被拒绝，此时 v 的值无意义
 func (el *eventLoopImpl) Await(prom any, timeout int64) (v any, err error) {
 	if timeout <= 0 {
 		return nil, NewRangeError("await timeout must be greater than 0")
@@ -241,7 +261,8 @@ func (el *eventLoopImpl) Await(prom any, timeout int64) (v any, err error) {
 	return
 }
 
-// ClearInterval [EventLoop.ClearInterval]
+// ClearInterval 清除由 [DocEventLoop.SetInterval] 函数创建的定时器
+//   - id 定时器ID
 func (el *eventLoopImpl) ClearInterval(id int) {
 	if id == -1 {
 		return
@@ -249,7 +270,8 @@ func (el *eventLoopImpl) ClearInterval(id int) {
 	el.timeline.clearCh <- id
 }
 
-// ClearTimeout [EventLoop.ClearTimeout]
+// ClearTimeout 清除由 [DocEventLoop.SetTimeout] 函数创建的定时器
+//   - id 定时器ID
 func (el *eventLoopImpl) ClearTimeout(id int) {
 	if id == -1 {
 		return
@@ -257,7 +279,10 @@ func (el *eventLoopImpl) ClearTimeout(id int) {
 	el.timeline.clearCh <- id
 }
 
-// Delay [EventLoop.Delay]
+// Delay 返回一个新的 [Promise]，其状态会在延迟时间后被解决
+//   - prom 将会使用的解决值，如果 prom 是 [Promise] 实例，则会等待其已决后才开始计时；
+//     如果是一个已拒绝的 [Promise]，则会立即拒绝新 [Promise]
+//   - millis 延迟时间，单位为毫秒
 func (el *eventLoopImpl) Delay(prom any, millis int64) Promise {
 	return el.NewPromise(func(resolve, reject func(v any)) error {
 		el.Resolve(prom).Then(func(v2 any) (any, error) {
@@ -273,7 +298,20 @@ func (el *eventLoopImpl) Delay(prom any, millis int64) Promise {
 	})
 }
 
-// Each [EventLoop.Each]
+// Each 按顺序等待 inputs 的每个元素已决，每个元素的结果会被传递给迭代器 it
+// 如果 it 返回一个 [Promise]，则会等待该 [Promise] 完成后再继续迭代；
+// 如果当前迭代对象是 [Promise]，则会等待其完成后再继续迭代；
+// 迭代过程中遇到任何一个已拒绝 [Promise]，新 Promise 也会以同样的理由被拒绝
+//   - it 对每个元素进行操作的函数，接受三个参数：item（当前元素）、index（当前元素的索引）、arrLen（数组长度）
+//   - inputs 需要迭代的输入
+//
+// 由于迭代器的输出会被丢弃，因此适合副作用操作，如打印日志等
+//
+// # return
+//
+// 一个 [Promise]，其状态将会是：
+//   - 已解决（[Fulfilled]）：如果所有迭代都成功解决，解决值是包含原始输入解决值的数组
+//   - 已拒绝（[Rejected]）：如果迭代过程中任何一个 [Promise] 被拒绝
 func (el *eventLoopImpl) Each(it func(item any, index int, arrLen int) any, inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -305,7 +343,13 @@ func (el *eventLoopImpl) Each(it func(item any, index int, arrLen int) any, inpu
 		}, nil)
 }
 
-// Filter [EventLoop.Filter]
+// Filter 过滤数组中的元素
+//
+// # return
+//
+// 一个新的 [Promise]，其状态将会是：
+//   - 已解决（[Fulfilled]）：如果所有 [Promise] 都成功解决，解决值是过滤后的数组
+//   - 已拒绝（[Rejected]）：如果任何一个 [Promise] 被拒绝
 func (el *eventLoopImpl) Filter(filter func(item any) bool, inputs ...any) Promise {
 	return el.Map(func(item any) any {
 		return el.All(item, filter(item))
@@ -323,7 +367,16 @@ func (el *eventLoopImpl) Filter(filter func(item any) bool, inputs ...any) Promi
 		}, nil)
 }
 
-// Map [EventLoop.Map]
+// Map 对输入数组中的每个元素应用一个函数，返回一个新的 [Promise] 数组，
+// 新数组的每个元素都是原数组对应元素应用函数后的结果
+//   - mapper 对每个元素进行映射操作的函数，接受一个参数 item 并返回一个新值
+//   - inputs 将被 mapper 处理的输入
+//
+// # return
+//
+// 一个 [Promise]，其状态将会是：
+//   - 已解决（[Fulfilled]）：如果所有 [Promise] 都成功解决，且每个 [Promise] 的解决值都被 mapper 处理后得到新值。
+//   - 已拒绝（[Rejected]）：如果任何一个 [Promise] 被拒绝
 func (el *eventLoopImpl) Map(mapper func(item any) any, inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -345,7 +398,8 @@ func (el *eventLoopImpl) Map(mapper func(item any) any, inputs ...any) Promise {
 	return el.All(result...)
 }
 
-// NewPromise [EventLoop.NewPromise]
+// NewPromise 创建一个新的 [Promise] 实例
+//   - exec 执行器函数，用于定义 [Promise] 的异步操作
 func (el *eventLoopImpl) NewPromise(exec Executor) Promise {
 	if exec == nil {
 		panic("Promise executor must be a function")
@@ -378,7 +432,15 @@ func (el *eventLoopImpl) NewPromise(exec Executor) Promise {
 	return prom
 }
 
-// Off [EventLoop.Off]
+// Off 解绑一个钩子函数
+//   - event 钩子事件类型，可选值为 [ [OnCreated] | [OnChained] | [OnFulfilled] | [OnRejected] | [OnSettled] ]
+//   - key 要解绑的钩子函数的唯一标识，由 [DocEventLoop.On] 方法返回
+//
+// event 与 key 必须匹配，否则将解绑失败
+//
+// # return
+//
+// 表明解绑是否成功的 bool 值
 func (el *eventLoopImpl) Off(event HookType, key string) bool {
 	if key == "" {
 		return false
@@ -413,7 +475,13 @@ func (el *eventLoopImpl) Off(event HookType, key string) bool {
 	return false
 }
 
-// On [EventLoop.On]
+// On 绑定一个钩子函数
+//   - event 钩子事件类型，可选值为 [ [OnCreated] | [OnChained] | [OnFulfilled] | [OnRejected] | [OnSettled] ]
+//   - hook 钩子函数，当事件触发时调用，并以触发该事件的 [Promise] 实例作为参数
+//
+// # return
+//
+// 绑定成功返回钩子函数的唯一标识，可用于后续解绑钩子函数，失败返回空字符串
 func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 	if hook == nil {
 		return ""
@@ -450,7 +518,12 @@ func (el *eventLoopImpl) On(event HookType, hook func(p Promise)) string {
 	return key
 }
 
-// PromiseWithResolvers [EventLoop.PromiseWithResolvers]
+// PromiseWithResolvers 创建一个新的 [Promise] 实例，同时返回 resolve 和 reject 函数，
+// 对应于传入给 Promise() 构造函数执行器的两个参数
+//
+// 这使得可以在 [Promise] 外部手动解决或拒绝 [Promise]，详见 [MDN]
+//
+// [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers#%E6%8F%8F%E8%BF%B0
 func (el *eventLoopImpl) PromiseWithResolvers() (Promise, func(any), func(any)) {
 	var resolve, reject func(any)
 	p := el.NewPromise(func(res, rej func(v any)) error {
@@ -461,7 +534,7 @@ func (el *eventLoopImpl) PromiseWithResolvers() (Promise, func(any), func(any)) 
 	return p, resolve, reject
 }
 
-// QueueMicrotask [EventLoop.QueueMicrotask]
+// QueueMicrotask 将回调函数添加到微任务队列末尾
 func (el *eventLoopImpl) QueueMicrotask(fn func()) {
 	if fn == nil {
 		return
@@ -469,7 +542,8 @@ func (el *eventLoopImpl) QueueMicrotask(fn func()) {
 	el.microtaskQueue <- fn
 }
 
-// Race [EventLoop.Race]
+// Race 等待第一个 [Promise] 已决，
+// 新 [Promise] 会在第一个 [Promise] 已决后解决或拒绝，解决值或拒绝理由跟随第一个完成的 [Promise]
 func (el *eventLoopImpl) Race(inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -495,7 +569,20 @@ func (el *eventLoopImpl) Race(inputs ...any) Promise {
 	})
 }
 
-// Reduce [EventLoop.Reduce]
+// Reduce 对数组中的每个元素应用一个函数 reducer，将其结果累积到 acc 中，最后返回 acc 的值
+//   - reducer 对每个元素进行操作的函数，接受两个参数 acc 和 cur，返回新的 acc
+//   - initial 初始值
+//   - inputs 被操作的数组
+//
+// # return
+//
+// 一个新的 [Promise]，其状态将会是：
+//   - 已解决（[Fulfilled]）：如果所有 [Promise] 都成功解决，且每个 [Promise] 的解决值都被 reducer 处理后得到新值
+//   - 已拒绝（[Rejected]）：如果任何一个 [Promise] 被拒绝
+//
+// 特殊情况：
+//   - 如果 inputs 为空数组，直接返回初始值 initial
+//   - 如果 initial 为 nil，且 inputs 只有一个元素，直接返回该元素
 func (el *eventLoopImpl) Reduce(reducer func(acc any, cur any) any, initial any, inputs ...any) Promise {
 	init := el.Resolve(initial)
 
@@ -521,7 +608,9 @@ func (el *eventLoopImpl) Reduce(reducer func(acc any, cur any) any, initial any,
 		}, nil)
 }
 
-// Reject [EventLoop.Reject]
+// Reject 返回一个已拒绝的 [Promise]，拒绝理由为指定值 reason，详见 [MDN]
+//
+// [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
 func (el *eventLoopImpl) Reject(reason any) Promise {
 	return el.NewPromise(func(resolve, reject func(v any)) error {
 		reject(reason)
@@ -529,7 +618,11 @@ func (el *eventLoopImpl) Reject(reason any) Promise {
 	})
 }
 
-// Resolve [EventLoop.Resolve]
+// Resolve 返回一个已解决的 [Promise]，解决值为指定值 value
+//
+// 如果 value 已经是 [Promise]，则直接返回该 [Promise]，详见 [MDN]
+//
+// [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/resolve
 func (el *eventLoopImpl) Resolve(value any) Promise {
 	if prom, ok := value.(Promise); ok {
 		return prom
@@ -541,7 +634,13 @@ func (el *eventLoopImpl) Resolve(value any) Promise {
 	})
 }
 
-// SetInterval [EventLoop.SetInterval]
+// SetInterval 模拟 setInterval 函数，以指定毫秒数为周期，重复调用回调函数
+//   - callback 回调函数
+//   - millis 延迟执行的毫秒数，自动修正负值的延迟为0
+//
+// # return
+//
+// 定时器 ID，可通过调用 [DocEventLoop.ClearInterval] 函数来清除定时器
 func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
 	if callback == nil {
 		return -1
@@ -549,7 +648,13 @@ func (el *eventLoopImpl) SetInterval(callback func(), millis int64) int {
 	return el.timeline.produceTask(callback, millis, true)
 }
 
-// SetTimeout [EventLoop.SetTimeout]
+// SetTimeout 模拟 setTimeout 函数，在指定毫秒数后调用回调函数
+//   - callback 回调函数
+//   - millis 延迟执行的毫秒数，自动修正负值的延迟为0
+//
+// # return
+//
+// 定时器 ID，可通过调用 [DocEventLoop.ClearTimeout] 函数来清除定时器
 func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
 	if callback == nil {
 		return -1
@@ -557,7 +662,13 @@ func (el *eventLoopImpl) SetTimeout(callback func(), millis int64) int {
 	return el.timeline.produceTask(callback, millis, false)
 }
 
-// Some [EventLoop.Some]
+// Some 等待 inputs 中前 num 个元素解决
+//   - 如果 num 个元素解决，新 [Promise] 也会被解决，且解决值为一个包含所有元素解决值的数组，
+//     其顺序为被解决的顺序
+//   - 如果太多元素被拒绝，以至于新 [Promise] 永远无法满足，那么新 [Promise] 会立即被拒绝，
+//     且拒绝理由为 [AggregateError]，其包含所有元素拒绝理由的数组，顺序为被拒绝的顺序
+//
+// 注意与 [DocEventLoop.Any] 的不同，不仅是解决值的格式不同，拒绝理由的顺序也不同
 func (el *eventLoopImpl) Some(num int, inputs ...any) Promise {
 	if inputs == nil {
 		return el.Reject(NewTypeError("nil is not iterable"))
@@ -601,7 +712,7 @@ func (el *eventLoopImpl) Some(num int, inputs ...any) Promise {
 	})
 }
 
-// Stop [EventLoop.Stop]
+// Stop 停止事件循环，将会等待其管理的异步任务完成才会返回
 func (el *eventLoopImpl) Stop() {
 	el.flushTasks()
 	close(el.done)
@@ -610,7 +721,18 @@ func (el *eventLoopImpl) Stop() {
 	_ = el.worker.Close()
 }
 
-// Try [EventLoop.Try]
+// Try 接受一个任意类型的回调函数，并将其结果封装成一个 [Promise]，详见 [MDN]。
+//   - fn 任意类型的回调函数，接受任意数量的参数，函数返回值格式为 (any, error)
+//   - args 将要传递给 fn 函数的参数列表
+//
+// # return
+//
+// 一个新的 [Promise]，其状态将会是：
+//   - 已解决（[Fulfilled]）：如果 fn 函数返回一个普通值
+//   - 已拒绝（[Rejected]）：如果 fn 函数返回了 err
+//   - 异步解决或拒绝：如果 fn 函数返回一个 [Promise]，新 [Promise] 会吸收该 [Promise] 的状态
+//
+// [MDN]: https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/try
 func (el *eventLoopImpl) Try(fn func(...any) (any, error), args ...any) Promise {
 	return el.NewPromise(func(resolve, reject func(v any)) error {
 		if fn == nil {
@@ -625,4 +747,11 @@ func (el *eventLoopImpl) Try(fn func(...any) (any, error), args ...any) Promise 
 		resolve(result)
 		return nil
 	})
+}
+
+// DocEventLoop 仅用于生成 [EventLoop] 的文档，请勿使用此类型
+//
+// 文档中的 DocEventLoop 用于指代 [EventLoop]
+type DocEventLoop struct {
+	eventLoopImpl
 }
