@@ -7,6 +7,8 @@ import (
 )
 
 // EventLoop 核心接口，定义了 [Promise] 异步相关的API
+//
+// # 通过 nil 调用 EventLoop 的任何方法都可能触发 panic
 type EventLoop struct {
 	microtaskQueue chan func()
 	macrotaskQueue chan func()

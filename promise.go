@@ -6,6 +6,8 @@ import (
 )
 
 // Promise 一个拥有 then 方法的对象，其行为符合 Promises/A+ 规范
+//
+// # 通过 nil 调用 Promise 的任何方法都可能触发 panic
 type Promise struct {
 	value           any
 	reason          error

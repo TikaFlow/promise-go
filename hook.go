@@ -7,22 +7,20 @@ import (
 // HookType 钩子类型
 type HookType string
 
-const (
-	// OnCreated 当 Promise 实例被创建时调用。
-	OnCreated HookType = "created"
+// OnCreated 当 Promise 实例被创建时调用。
+const OnCreated HookType = "created"
 
-	// OnChained 当 Promise 实例被链式调用时调用。
-	OnChained HookType = "chained"
+// OnChained 当 Promise 实例被链式调用时调用。
+const OnChained HookType = "chained"
 
-	// OnFulfilled 当 Promise 实例解决时调用。
-	OnFulfilled HookType = "fulfilled"
+// OnFulfilled 当 Promise 实例解决时调用。
+const OnFulfilled HookType = "fulfilled"
 
-	// OnRejected 当 Promise 实例拒绝时调用。
-	OnRejected HookType = "rejected"
+// OnRejected 当 Promise 实例拒绝时调用。
+const OnRejected HookType = "rejected"
 
-	// OnSettled 当 Promise 实例被解决（无论成功或拒绝）时调用。
-	OnSettled HookType = "settled"
-)
+// OnSettled 当 Promise 实例被解决（无论成功或拒绝）时调用。
+const OnSettled HookType = "settled"
 
 // 钩子实例定义
 type promiseHooks struct {
