@@ -39,24 +39,28 @@ func (el *EventLoop) run() {
 		select {
 		case task := <-el.microtaskQueue:
 			task()
+			continue
 		case <-el.done:
 			return
 		default:
-			select {
-			case task := <-el.macrotaskQueue:
-				task()
-			case <-el.done:
-				return
-			default:
-				select {
-				case task := <-el.microtaskQueue:
-					task()
-				case task := <-el.macrotaskQueue:
-					task()
-				case <-el.done:
-					return
-				}
-			}
+		}
+
+		select {
+		case task := <-el.macrotaskQueue:
+			task()
+			continue
+		case <-el.done:
+			return
+		default:
+		}
+
+		select {
+		case task := <-el.microtaskQueue:
+			task()
+		case task := <-el.macrotaskQueue:
+			task()
+		case <-el.done:
+			return
 		}
 	}
 }
