@@ -6,7 +6,7 @@
 
 - 运行全部测试（与 CI 一致）：`go test -v ./...`
 - 运行测试（静默）：`go test ./...`
-- 运行单个测试：`go test -run TestXxx ./...`（测试位于 `test/` 目录及根目录 `example_test.go`）
+- 运行单个测试：`go test -run TestXxx ./...`（测试位于 `test/`、`aplus_test/` 目录及根目录 `example_test.go`）
 - 构建：`go build ./...`
 - 静态检查：`go vet ./...`
 - CI 配置：`.github/workflows/go-test.yml`，Ubuntu + `go-version-file: go.mod`（go 1.25），仅执行 `go test -v ./...`；无 Makefile、无额外 lint 配置（`go fmt` 即可）。
@@ -46,6 +46,7 @@
 
 ## 测试组织
 
-- 主体测试位于 `test/` 目录，使用外部测试包 `promise_test`，通过点导入 `. "github.com/TikaFlow/promise-go"` 引用主包；`main_test.go` 的 `TestMain` 创建共享的 `el = StartEventLoop(10)` 并在退出时 `Stop()`
+- `aplus_test/`：Promises/A+ 官方合规套件移植（`promises-aplus-tests`，约 209 个叶子用例 + 9 组 N/A skip），用于自检 A+ 合规性；`main_test.go` 的 `TestMain` 创建共享 `el = StartEventLoop(1)` 并在退出时 `Stop()`。详见解包内 `REPORT.md`
+- `test/`：库自身功能测试——宏任务队列（`SetTimeout`/`SetInterval`）、ES/Promise 扩展（`All`/`AllSettled`/`Race`/`Any`/`Some`/`Map`/`Filter`/`Each`/`Reduce`）、工具 API（`Await`/`Delay`/`Try`/`Async`/`PromiseWithResolvers`）、钩子（`On`/`Off`）、状态访问器（`State`/`Value`/`Reason`/`Done`）、事件循环时序（宏/微任务顺序）等非 A+ 部分。两个目录均使用外部测试包名（`promise_test`），点导入 `. "github.com/TikaFlow/promise-go"` 引用主包
 - 根目录 `example_test.go` 是可运行的示例（`Output:` 注释即断言）
 - 涉及事件循环/时序的测试常依赖 `time.Sleep`，执行结果与 goroutine 繁忙程度相关；单独运行某个测试时需留意事件循环 worker 数量与延时
