@@ -420,7 +420,7 @@ func (el *EventLoop) NewPromise(exec Executor) *Promise {
 		value:           nil,
 		reason:          nil,
 		state:           Pending,
-		settledHandlers: make(chan *handler, 128),
+		settledHandlers: make([]*handler, 0),
 		settled:         make(chan struct{}),
 		eventLoop:       el,
 	}

@@ -13,7 +13,7 @@ type Promise struct {
 	reason          error
 	state           string
 	dataLock        sync.RWMutex
-	settledHandlers chan *handler
+	settledHandlers []*handler
 	settled         chan struct{}
 	resolved        sync.Once
 	// 所属的事件循环
@@ -27,6 +27,22 @@ type handler struct {
 
 	// 即将返回的 Promise 实例（新）
 	prom *Promise
+}
+
+// addHandler 将回调处理器追加到待处理列表。注册可无限次、永不阻塞（修正固定缓冲上限导致的死锁）。
+func (prom *Promise) addHandler(h *handler) {
+	prom.dataLock.Lock()
+	prom.settledHandlers = append(prom.settledHandlers, h)
+	prom.dataLock.Unlock()
+}
+
+// takeHandlers 原子地取出并清空全部待处理回调，按注册顺序返回。
+func (prom *Promise) takeHandlers() []*handler {
+	prom.dataLock.Lock()
+	hs := prom.settledHandlers
+	prom.settledHandlers = nil
+	prom.dataLock.Unlock()
+	return hs
 }
 
 // State 返回 [Promise] 的当前状态
@@ -63,11 +79,11 @@ func (prom *Promise) Then(onFulfilled ThenCallback, onRejected CatchCallback) *P
 		return nil
 	})
 	prom.eventLoop.hooks.callHooks(OnChained, prom)
-	prom.settledHandlers <- &handler{
+	prom.addHandler(&handler{
 		onFulfilled: onFulfilled,
 		onRejected:  onRejected,
 		prom:        prom2,
-	}
+	})
 
 	if prom.State() != Pending {
 		flushHandlers(prom)
