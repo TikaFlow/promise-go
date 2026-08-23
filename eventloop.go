@@ -309,6 +309,32 @@ func (el *EventLoop) Delay(prom any, millis int64) *Promise {
 	})
 }
 
+// Timeout 返回一个新的 [Promise]：
+//   - 若 prom 在 millis 毫秒内未 settled，则以 *TimeoutError 拒绝新 [Promise]；
+//   - 否则跟随 prom 的状态（同值 / 同理由）
+//
+// millis 负值按 0 处理（与 [EventLoop.SetTimeout] 一致）。它是框架层的显式超时组合子：
+// 按需为某个 promise 配置超时，不影响其他 promise，也不改动 [Promise] 结构。
+func (el *EventLoop) Timeout(prom any, millis int64) *Promise {
+	base := el.Resolve(prom)
+	return el.NewPromise(func(resolve, reject func(v any)) error {
+		id := el.SetTimeout(func() {
+			reject(NewTimeoutError("promise timed out"))
+		}, millis)
+
+		base.Then(func(v any) (any, error) {
+			el.ClearTimeout(id)
+			resolve(v)
+			return nil, nil
+		}, func(r error) (any, error) {
+			el.ClearTimeout(id)
+			reject(r)
+			return nil, nil
+		})
+		return nil
+	})
+}
+
 // Each 按顺序等待 inputs 的每个元素已决，每个元素的结果会被传递给迭代器 it
 // 如果 it 返回一个 [Promise]，则会等待该 [Promise] 完成后再继续迭代；
 // 如果当前迭代对象是 [Promise]，则会等待其完成后再继续迭代；
