@@ -189,6 +189,7 @@ func (q *Queue[T]) feed() {
 func (q *Queue[T]) empty() bool {
 	q.mu.Lock()
 	empty := q.head == q.tail
+	sending := q.sending.Load() // 与链表读取同一临界区，消除跨锁竞态
 	q.mu.Unlock()
-	return empty && !q.sending.Load()
+	return empty && !sending
 }

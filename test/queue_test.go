@@ -226,3 +226,85 @@ func TestQueueRetainBound(t *testing.T) {
 	}
 	q.Close()
 }
+
+// 测试微任务队列在远超原容量（10240）时依然不阻塞
+func TestQueueMicrotaskOverCapacity(t *testing.T) {
+	el2 := StartEventLoop(4)
+	defer el2.Stop()
+	const n = 20000 // 远超原 chan 容量 1024*10
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < n; i++ {
+			el2.QueueMicrotask(func() {})
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("微任务队列在超容量时阻塞了")
+	}
+}
+
+// 测试宏任务队列在远超原容量（10240）时依然不阻塞
+func TestQueueMacrotaskOverCapacity(t *testing.T) {
+	el2 := StartEventLoop(4)
+	defer el2.Stop()
+	const n = 20000
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < n; i++ {
+			el2.SetTimeout(func() {}, 100000) // 超长延迟，避免触发执行
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("宏任务队列在超容量时阻塞了")
+	}
+}
+
+// 测试定时器注册（taskCh）在远超原容量（10240）时依然不阻塞
+func TestQueueTimelineTaskOverCapacity(t *testing.T) {
+	el2 := StartEventLoop(4)
+	defer el2.Stop()
+	const n = 20000
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < n; i++ {
+			el2.SetTimeout(func() {}, 100000)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("定时器注册队列在超容量时阻塞了")
+	}
+}
+
+// 测试定时器清除（clearCh）在远超原容量（10240）时依然不阻塞。
+// 仅注册少量定时器，循环清除，避免 removeTask 的 O(n) 扫描在超量场景下退化为 O(n²)。
+func TestQueueTimelineClearOverCapacity(t *testing.T) {
+	el2 := StartEventLoop(4)
+	defer el2.Stop()
+	// 注册少量定时器，其 id 供清除复用
+	var ids []int
+	for i := 0; i < 100; i++ {
+		ids = append(ids, el2.SetTimeout(func() {}, 100000))
+	}
+	const n = 20000
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < n; i++ {
+			el2.ClearTimeout(ids[i%len(ids)])
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("定时器清除队列在超容量时阻塞了")
+	}
+}

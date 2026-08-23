@@ -43,7 +43,7 @@ func (el *EventLoop) flushTasks() {
 //
 // pop 通道为空但内部链表尚有元素（feed 尚未搬运）时，阻塞等待 feed 送达，
 // 确保"先微后宏"的时序不被 feed 的异步搬运延迟破坏。
-// 返回 false 表示事件循环应结束（pop 通道已关闭）。
+// 返回 false 表示事件循环应结束（pop 通道已关闭或收到 done 信号）。
 func (el *EventLoop) drainMicro() bool {
 	for {
 		select {
@@ -55,16 +55,21 @@ func (el *EventLoop) drainMicro() bool {
 			continue
 		default:
 		}
-		// pop 通道当前为空；若链表也已空（含 feed 无在途）则真正排空完成
+		// 所有即时可读的任务已消费完；若队列真为空则排空完成
 		if el.microtaskQueue.empty() {
 			return true
 		}
-		// 链表尚有未搬运元素，阻塞等待 feed 送达
-		task, ok := <-el.microtaskQueue.Pop()
-		if !ok {
+		// 链表尚有数据在搬运途中，阻塞等待 feed 送达
+		// 同时监听 done 防止事件循环关闭时死锁
+		select {
+		case task, ok := <-el.microtaskQueue.Pop():
+			if !ok {
+				return false
+			}
+			task()
+		case <-el.done:
 			return false
 		}
-		task()
 	}
 }
 
