@@ -43,6 +43,7 @@
 - 完整的 `Promises/A+` 规范实现，支持链式调用
 - 模拟 `JavaScript` 事件循环的微任务队列和宏任务队列
 - 批量处理：`All`、`AllSettled`、`Race`、`Any`、`Some`
+- 超时组合子：`Timeout`（为单个 Promise 设定超时，超时以 `TimeoutError` 拒绝）
 - 定时器：`SetTimeout`、`SetInterval`、`Delay`
 - 迭代方法：`Map`、`Filter`、`Each`、`Reduce`
 - 钩子函数：支持在 `Promise` 生命周期的关键节点插入回调
@@ -156,7 +157,7 @@ _ = el.Off(promise.OnCreated, key)
 - 如果给 `resolve` 传递一个 `Promise` 实例，返回的 `Promise` 将跟随该实例的状态
 - 如果解决值是 `Promise` 本身，会抛出 `TypeError`（防止循环引用）
 - `Then` 方法返回的新 `Promise` 状态由回调函数的执行结果决定
-- 回调函数抛出异常会导致新 `Promise` 被拒绝
+- 回调或执行器函数抛出异常（`return err` 或 `panic`）会导致新 `Promise` 被拒绝
 - 微任务（`Promise` 回调）优先于宏任务（定时器）执行
 - 不同 `EventLoop` 之间**不保证**全局时序：当某个 `Promise` 采纳了另一事件循环的 `Promise` 时，其状态可能由另一事件循环的 goroutine 设置。`EventLoop.Resolve` 对已是 `Promise` 的值会直接返回原对象、不重新绑定事件循环，因此链式调用可能跨事件循环。跨事件循环互操作仅保证状态一致性，不保证时序；如需确定时序，请让相关 `Promise` 属于同一个 `EventLoop`
 
