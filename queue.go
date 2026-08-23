@@ -1,6 +1,9 @@
 package promise
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 const (
 	// queueMinBufSize pop 通道缓冲区的最小容量
@@ -31,6 +34,7 @@ type Queue[T any] struct {
 	closed    bool
 	ch        chan T        // 对外只读通道（有缓冲）
 	notify    chan struct{} // 信号通道，用于唤醒 feed goroutine
+	sending   atomic.Bool   // feed 是否正将一个元素发送到 ch（在途）
 }
 
 // NewQueue 创建一个"无限容量"的 FIFO 队列。
@@ -163,8 +167,12 @@ func (q *Queue[T]) feed() {
 		q.mu.Lock()
 		v, ok := nextValue()
 		if ok {
+			q.sending.Store(true) // 标记在途，供 empty() 识别
 			q.mu.Unlock()
 			q.ch <- v // 可能阻塞，不持锁
+			q.mu.Lock()
+			q.sending.Store(false)
+			q.mu.Unlock()
 			continue
 		}
 		closed := q.closed
@@ -175,4 +183,12 @@ func (q *Queue[T]) feed() {
 		}
 		<-q.notify
 	}
+}
+
+// empty 报告是否没有待读元素：内部链表为空且 feed 无在途发送。
+func (q *Queue[T]) empty() bool {
+	q.mu.Lock()
+	empty := q.head == q.tail
+	q.mu.Unlock()
+	return empty && !q.sending.Load()
 }

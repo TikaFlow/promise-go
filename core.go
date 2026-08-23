@@ -80,8 +80,8 @@ type Executor func(resolve, reject func(v any)) (err error)
 //   - workerCount: 工作线程数量
 func StartEventLoop(workerCount int) *EventLoop {
 	el := &EventLoop{
-		microtaskQueue: make(chan func(), 1024*10),
-		macrotaskQueue: make(chan func(), 1024*10),
+		microtaskQueue: NewQueue[func()](taskQueueBufSize),
+		macrotaskQueue: NewQueue[func()](taskQueueBufSize),
 		done:           make(chan struct{}),
 	}
 

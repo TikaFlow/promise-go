@@ -27,7 +27,7 @@ type timedTask struct {
 
 // 将任务推送到宏任务队列
 func (tl *timeLine) queueMacrotask(fn func()) {
-	tl.eventLoop.macrotaskQueue <- fn
+	tl.eventLoop.macrotaskQueue.Push(fn)
 }
 
 // 重置定时器，参数是到期时间

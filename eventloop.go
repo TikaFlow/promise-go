@@ -6,12 +6,15 @@ import (
 	pool "github.com/TikaFlow/worker-pool"
 )
 
+// taskQueueBufSize 微任务/宏任务 Queue 的 pop 通道缓冲容量
+const taskQueueBufSize = 1024
+
 // EventLoop 核心接口，定义了 [Promise] 异步相关的API
 //
 // # 通过 nil 调用 EventLoop 的任何方法都可能触发 panic
 type EventLoop struct {
-	microtaskQueue chan func()
-	macrotaskQueue chan func()
+	microtaskQueue *Queue[func()]
+	macrotaskQueue *Queue[func()]
 	looper         pool.Pool
 	scheduler      pool.Pool
 	worker         pool.Pool
@@ -25,12 +28,42 @@ func (el *EventLoop) flushTasks() {
 	for _, task := range el.timeline.tasks {
 		el.timeline.queueMacrotask(task.callback)
 	}
-	close(el.macrotaskQueue)
-	close(el.microtaskQueue)
-	for task := range el.microtaskQueue {
+	// 关闭后 feed 会排空剩余任务并关闭 pop 通道，range 随之结束
+	el.macrotaskQueue.Close()
+	el.microtaskQueue.Close()
+	for task := range el.microtaskQueue.Pop() {
 		task()
 	}
-	for task := range el.macrotaskQueue {
+	for task := range el.macrotaskQueue.Pop() {
+		task()
+	}
+}
+
+// drainMicro 同步排空微任务队列中所有已入队的微任务。
+//
+// pop 通道为空但内部链表尚有元素（feed 尚未搬运）时，阻塞等待 feed 送达，
+// 确保"先微后宏"的时序不被 feed 的异步搬运延迟破坏。
+// 返回 false 表示事件循环应结束（pop 通道已关闭）。
+func (el *EventLoop) drainMicro() bool {
+	for {
+		select {
+		case task, ok := <-el.microtaskQueue.Pop():
+			if !ok {
+				return false
+			}
+			task()
+			continue
+		default:
+		}
+		// pop 通道当前为空；若链表也已空（含 feed 无在途）则真正排空完成
+		if el.microtaskQueue.empty() {
+			return true
+		}
+		// 链表尚有未搬运元素，阻塞等待 feed 送达
+		task, ok := <-el.microtaskQueue.Pop()
+		if !ok {
+			return false
+		}
 		task()
 	}
 }
@@ -38,8 +71,15 @@ func (el *EventLoop) flushTasks() {
 // 事件循环：清空微队列 -> 执行一个宏任务（如有） -> 清空微队列 ...
 func (el *EventLoop) run() {
 	for {
+		if !el.drainMicro() {
+			return
+		}
+
 		select {
-		case task := <-el.microtaskQueue:
+		case task, ok := <-el.macrotaskQueue.Pop():
+			if !ok {
+				return
+			}
 			task()
 			continue
 		case <-el.done:
@@ -48,18 +88,15 @@ func (el *EventLoop) run() {
 		}
 
 		select {
-		case task := <-el.macrotaskQueue:
+		case task, ok := <-el.microtaskQueue.Pop():
+			if !ok {
+				return
+			}
 			task()
-			continue
-		case <-el.done:
-			return
-		default:
-		}
-
-		select {
-		case task := <-el.microtaskQueue:
-			task()
-		case task := <-el.macrotaskQueue:
+		case task, ok := <-el.macrotaskQueue.Pop():
+			if !ok {
+				return
+			}
 			task()
 		case <-el.done:
 			return
@@ -587,7 +624,7 @@ func (el *EventLoop) QueueMicrotask(fn func()) {
 	if fn == nil {
 		return
 	}
-	el.microtaskQueue <- fn
+	el.microtaskQueue.Push(fn)
 }
 
 // Race 等待第一个 [Promise] 已决，
