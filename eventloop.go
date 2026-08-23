@@ -247,8 +247,9 @@ func (el *EventLoop) Await(prom any, timeout int64) (v any, err error) {
 		return prom, nil
 	}
 
+	var timerID int
 	wait := el.NewPromise(func(resolve, reject func(v any)) error {
-		el.SetTimeout(func() {
+		timerID = el.SetTimeout(func() {
 			reject(NewTimeoutError("await timeout"))
 		}, timeout)
 		return nil
@@ -256,6 +257,7 @@ func (el *EventLoop) Await(prom any, timeout int64) (v any, err error) {
 
 	select {
 	case <-prom2.Done():
+		el.ClearTimeout(timerID)
 		if prom2.State() == Rejected {
 			err = prom2.Reason()
 		} else {
