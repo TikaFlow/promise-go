@@ -79,6 +79,16 @@ func (q *Queue[T]) Push(v T) bool {
 	if q.closed {
 		return false
 	}
+	// 快速路径：队列空闲（链表空且 feed 无在途发送）时，非阻塞直写 pop 通道，
+	// 跳过 feed 搬运的一跳调度延迟。必须持锁判定该条件，否则会越过 feed
+	// 在途元素或并发直写而乱序；仅当通道写满时才回退到链表。
+	if q.head == q.tail && !q.sending.Load() {
+		select {
+		case q.ch <- v:
+			return true
+		default:
+		}
+	}
 	q.tail.value = v
 	// 推进 tail：优先复用末尾的空闲节点，否则分配新节点
 	if q.tail.next == nil {
@@ -185,11 +195,12 @@ func (q *Queue[T]) feed() {
 	}
 }
 
-// empty 报告是否没有待读元素：内部链表为空且 feed 无在途发送。
+// empty 报告是否没有待读元素：内部链表为空、feed 无在途发送，且 pop 通道已空。
+// 末项用于识别 Push 直写入 ch 的元素，保证事件循环排空时不会漏掉它们。
 func (q *Queue[T]) empty() bool {
 	q.mu.Lock()
 	empty := q.head == q.tail
 	sending := q.sending.Load() // 与链表读取同一临界区，消除跨锁竞态
 	q.mu.Unlock()
-	return empty && !sending
+	return empty && !sending && len(q.ch) == 0
 }
