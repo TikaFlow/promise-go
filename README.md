@@ -158,6 +158,7 @@ _ = el.Off(promise.OnCreated, key)
 - `Then` 方法返回的新 `Promise` 状态由回调函数的执行结果决定
 - 回调函数抛出异常会导致新 `Promise` 被拒绝
 - 微任务（`Promise` 回调）优先于宏任务（定时器）执行
+- 不同 `EventLoop` 之间**不保证**全局时序：当某个 `Promise` 采纳了另一事件循环的 `Promise` 时，其状态可能由另一事件循环的 goroutine 设置。`EventLoop.Resolve` 对已是 `Promise` 的值会直接返回原对象、不重新绑定事件循环，因此链式调用可能跨事件循环。跨事件循环互操作仅保证状态一致性，不保证时序；如需确定时序，请让相关 `Promise` 属于同一个 `EventLoop`
 
 ## 许可证
 
