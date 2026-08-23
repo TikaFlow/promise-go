@@ -211,6 +211,12 @@ func (el *EventLoop) Async(fn func() (any, error)) *Promise {
 
 	return el.NewPromise(func(resolve, reject func(any)) error {
 		task := func() {
+			// fn 内 panic 同样视为拒绝理由
+			defer func() {
+				if r := recover(); r != nil {
+					reject(r)
+				}
+			}()
 			v, err := fn()
 			if err != nil {
 				reject(err)
@@ -431,9 +437,18 @@ func (el *EventLoop) NewPromise(exec Executor) *Promise {
 		})
 	}
 
-	if err := exec(res, rej); err != nil {
-		rej(err)
-	}
+	// 执行器内部发生 panic 时，同样按照规范将其作为拒绝理由处理。
+	// 注：若执行器先 resolve 再 panic，sync.Once 保证该 panic 被忽略（规范 2.3.3 已决后忽略）。
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				rej(r)
+			}
+		}()
+		if err := exec(res, rej); err != nil {
+			rej(err)
+		}
+	}()
 	return prom
 }
 

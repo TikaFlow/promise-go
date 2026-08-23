@@ -77,6 +77,13 @@ func flushHandlers(cur *Promise) {
 		select {
 		case hdl := <-cur.settledHandlers:
 			job := func() {
+				// 2.2.7.2 回调通过 panic 抛出的异常同样视为拒绝理由（与返回 err 等价）
+				defer func() {
+					if r := recover(); r != nil {
+						rejectPromise(hdl.prom, r)
+					}
+				}()
+
 				var res any
 				var err error
 				if cur.State() == Fulfilled {
