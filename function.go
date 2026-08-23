@@ -35,11 +35,16 @@ func resolvePromise(prom *Promise, value any) {
 	// 2.3.3 同上
 
 	// 2.3.4 其他情况，则使用 value 作为已决值
+	// 状态判定 + close 放入同一把写锁临界区，结构上避免"双 close"。
 	prom.dataLock.Lock()
+	if prom.state != Pending {
+		prom.dataLock.Unlock()
+		return
+	}
 	prom.state = Fulfilled
 	prom.value = value
-	prom.dataLock.Unlock()
 	close(prom.settled)
+	prom.dataLock.Unlock()
 	prom.eventLoop.hooks.callHooks(OnSettled, prom)
 	prom.eventLoop.hooks.callHooks(OnFulfilled, prom)
 	flushHandlers(prom)
@@ -60,11 +65,16 @@ func rejectPromise(prom *Promise, r any) {
 		reason = NewUnexpectedError(r)
 	}
 
+	// 状态判定 + close 放入同一把写锁临界区，结构上避免"双 close"。
 	prom.dataLock.Lock()
+	if prom.state != Pending {
+		prom.dataLock.Unlock()
+		return
+	}
 	prom.state = Rejected
 	prom.reason = reason
-	prom.dataLock.Unlock()
 	close(prom.settled)
+	prom.dataLock.Unlock()
 	prom.eventLoop.hooks.callHooks(OnSettled, prom)
 	prom.eventLoop.hooks.callHooks(OnRejected, prom)
 	flushHandlers(prom)
