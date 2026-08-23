@@ -97,28 +97,27 @@ func TestFinallyFulfilled(t *testing.T) {
 	}, nil)
 }
 
-// 测试Finally方法 - 拒绝状态
+// 测试Finally方法 - 拒绝状态：原 promise 拒绝时，应沿用原拒绝理由（而非以理由作为解决值）。
 func TestFinallyRejected(t *testing.T) {
 	t.Parallel()
 	finallyCalled := false
 
 	p1 := el.NewPromise(func(resolve, reject func(v any)) error {
-		reject("error")
+		reject(errors.New("error"))
 		return nil
 	})
 
-	p1.Finally(func() (any, error) {
+	d := p1.Finally(func() (any, error) {
 		finallyCalled = true
 		return nil, nil
-	}).Then(nil, func(v error) (any, error) {
-		if !finallyCalled {
-			t.Errorf("Finally callback was not called")
-		}
-		if v.Error() != "error" {
-			t.Errorf("Expected value 'error', got %v", v.Error())
-		}
-		return nil, nil
 	})
+	_, err := el.Await(d, 200)
+	if err == nil || err.Error() != "error" {
+		t.Fatalf("expected rejection with 'error', got v=%v err=%v", d.Value(), err)
+	}
+	if !finallyCalled {
+		t.Errorf("Finally callback was not called")
+	}
 }
 
 // 测试Finally方法返回被拒绝的Promise
@@ -145,6 +144,52 @@ func TestFinallyReturnsRejectedPromise(t *testing.T) {
 		}
 		return nil, nil
 	})
+}
+
+// onFinally 返回一个已解决的 promise：其值被丢弃，新 promise 仍以原拒绝理由拒绝。
+func TestFinallyRejectedDiscardFulfilledPromise(t *testing.T) {
+	t.Parallel()
+	p1 := el.Reject(errors.New("boom"))
+	d := p1.Finally(func() (any, error) {
+		return el.Resolve("ignored"), nil
+	})
+	_, err := el.Await(d, 200)
+	if err == nil || err.Error() != "boom" {
+		t.Fatalf("expected rejection with 'boom', got v=%v err=%v", d.Value(), err)
+	}
+}
+
+// onFinally 返回一个已解决的 promise：其值被丢弃，新 promise 以原解决值解决。
+func TestFinallyFulfilledDiscardFulfilledPromise(t *testing.T) {
+	t.Parallel()
+	p1 := el.Resolve("orig")
+	d := p1.Finally(func() (any, error) {
+		return el.Resolve("ignored"), nil
+	})
+	v, err := el.Await(d, 200)
+	if err != nil || v != "orig" {
+		t.Fatalf("expected fulfillment with 'orig', got v=%v err=%v", v, err)
+	}
+}
+
+// onFinally 返回未决 promise 时不等待，新 promise 立即沿用原状态；
+// 该 promise 稍后拒绝也不影响新 promise（与 MDN 在“等待未决”上的设计取舍）。
+func TestFinallyPendingNotAwaited(t *testing.T) {
+	t.Parallel()
+	p1 := el.Resolve("orig")
+	p, _, rejectP := el.PromiseWithResolvers()
+	d := p1.Finally(func() (any, error) {
+		return p, nil
+	})
+	v, err := el.Await(d, 200)
+	if err != nil || v != "orig" {
+		t.Fatalf("expected fulfillment with 'orig' sans wait, got v=%v err=%v", v, err)
+	}
+	el.SetTimeout(func() { rejectP(errors.New("late")) }, 50)
+	time.Sleep(150 * time.Millisecond)
+	if d.State() != Fulfilled || d.Value() != "orig" {
+		t.Fatalf("expected Fulfilled/'orig' after late reject, got %s/%v", d.State(), d.Value())
+	}
 }
 
 // 测试String函数的格式化输出

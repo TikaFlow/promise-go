@@ -105,32 +105,31 @@ func (prom *Promise) Catch(onRejected CatchCallback) *Promise {
 
 // Finally 返回一个新的 [Promise]，其状态和结果与原 [Promise] 相同，以下情况除外：
 //   - onFinally 抛出异常 e，则以 e 为理由拒绝新 [Promise]
-//   - onFinally 返回一个拒绝的 [Promise] 实例，则以同样的理由拒绝新 [Promise]
+//   - onFinally 返回一个已拒绝的 [Promise] 实例，则以同样的理由拒绝新 [Promise]
+//
+// onFinally 返回的未决/已解决 [Promise]：其返回值被丢弃，新 [Promise] 仍沿用原已决状态
+// （不等待该 [Promise]；与 MDN 的 Promise.resolve(onFinally()).then(...) 在“等待未决”上不同）。
 func (prom *Promise) Finally(onFinally FinallyCallback) *Promise {
-	resCb := func(v any) (any, error) {
+	pass := func(val any, reason error) (any, error) {
 		if onFinally == nil {
-			return v, nil
+			return val, reason
 		}
 
 		res, err := onFinally()
 		if err != nil {
-			return res, err
+			return nil, err
 		}
 
-		if result, ok := res.(*Promise); ok {
-			if result.State() == Rejected {
-				reason := result.Reason()
-				return nil, reason
-			}
+		if p, ok := res.(*Promise); ok && p.State() == Rejected {
+			return nil, p.Reason()
 		}
 
-		return v, nil
+		return val, reason
 	}
-	rejCb := func(r error) (any, error) {
-		return resCb(r)
-	}
-
-	return prom.Then(resCb, rejCb)
+	return prom.Then(
+		func(v any) (any, error) { return pass(v, nil) },
+		func(r error) (any, error) { return pass(nil, r) },
+	)
 }
 
 // String [fmt.Stringer.String] 接口实现
