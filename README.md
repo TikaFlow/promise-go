@@ -127,6 +127,8 @@ func main() {
 
 > `Promise` 统一用 `any` 承载值，以符合 `Promises/A+` 允许任意已决类型及状态穿透的约定。
 
+> 暂未实现与其他 `Promise`(thenable) 实现的互操作。
+
 ## 钩子函数
 
 `EventLoop` 支持在 `Promise` 生命周期的关键节点插入回调：

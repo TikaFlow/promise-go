@@ -15,6 +15,8 @@
 
 单一 Go 包 `promise`（module `github.com/TikaFlow/promise-go`），无子包。核心难点是事件循环调度与 Promises/A+ 状态机，改动某个功能往往需要同时修改多个文件。
 
+> 暂未实现与其他 `Promise`(thenable) 实现的互操作。
+
 ### EventLoop 与事件循环
 
 `StartEventLoop(workerCount)` 创建并启动一个 `EventLoop`，模拟 JS 事件循环：执行每个宏任务前总是先清空微任务队列（顺序：清空微队列 → 执行一个宏任务 → 清空微队列 ……）。所有 Promise 都绑定到某个 EventLoop（字段 `prom.eventLoop`），且必须通过 `el.Stop()` 关闭。
