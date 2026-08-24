@@ -149,6 +149,7 @@ func TestSetTimeoutCancel(t *testing.T) {
 		id := el.SetTimeout(func() {
 			resolve("timeout value")
 		}, 1000)
+		time.Sleep(20 * time.Millisecond)
 		el.ClearTimeout(id)
 		return nil
 	})
