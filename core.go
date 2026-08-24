@@ -2,7 +2,8 @@
 Package promise 提供了 [Promise] 的 Golang 实现，其行为符合 [Promises/A+] 规范，
 并参考 [ES/Promise] 规范，尽可能模拟了 JavaScript 事件循环中 [ES/Promise] 的行为。
 
-与 [ES/Promise] 一样，运行在单个 goroutine 中，因此也“继承”了一些特点：
+与 [ES/Promise] 一样，Promise 回调在逻辑上按单线程事件循环的方式串行执行（异步），
+因此也“继承”了 JavaScript 单线程/异步的一些特点：
   - 可以在不同 goroutine 中创建、使用 [Promise]，且能保证逻辑上的有序调用
   - [Promise.Then] 中的回调函数长时间运行将会阻塞其他 [Promise] 实例的运行
   - [EventLoop.SetTimeout] 和 [EventLoop.SetInterval] 无法保证精确的调度，会受到 goroutine 繁忙的影响
