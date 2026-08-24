@@ -1,7 +1,5 @@
 package promise
 
-import "math/rand"
-
 // 解决一个 [Promise]
 func resolvePromise(prom *Promise, value any) {
 	if prom == nil {
@@ -129,27 +127,4 @@ func flushHandlers(cur *Promise) {
 		}
 		cur.eventLoop.QueueMicrotask(job)
 	}
-}
-
-// 获取一个指定长度的随机字符串
-func randString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
-	}
-	return "@" + string(result)
-}
-
-// 从 slice 中删除内容为 key 的元素
-func deleteFromSlice(slice *[]string, key string) bool {
-	target := false
-	for i, k := range *slice {
-		if k == key {
-			target = true
-			*slice = append((*slice)[:i], (*slice)[i+1:]...)
-			break
-		}
-	}
-	return target
 }
