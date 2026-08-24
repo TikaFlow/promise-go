@@ -41,6 +41,9 @@ func (el *EventLoop) Async(fn func() (any, error)) *Promise {
 //
 //   - v 目标 prom 的解决值
 //   - err 拒绝理由，当 err 存在时，代表 [Promise] 被拒绝，此时 v 的值无意义
+//
+// 警告：Await 会阻塞当前 goroutine。不建议在事件循环回调（如 Then/定时器回调）中调用，
+// 否则会阻塞事件循环，甚至死锁。
 func (el *EventLoop) Await(prom any, timeout int64) (v any, err error) {
 	if timeout <= 0 {
 		return nil, NewRangeError("await timeout must be greater than 0")
