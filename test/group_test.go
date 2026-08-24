@@ -360,7 +360,7 @@ func TestEachIteratorReturnsPromise(t *testing.T) {
 			return nil, nil
 		}, nil)
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Each方法 - 空数组
@@ -376,7 +376,7 @@ func TestEachEmptyArray(t *testing.T) {
 			return nil, nil
 		}, nil)
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Filter方法 - 全部成功
@@ -440,7 +440,7 @@ func TestFilterEmptyArray(t *testing.T) {
 			return nil, nil
 		}, nil)
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Map方法 - 全部成功
@@ -531,7 +531,7 @@ func TestRaceFulfilled(t *testing.T) {
 		return nil, nil
 	})
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Race方法 - nil数组
@@ -574,7 +574,7 @@ func TestRaceRejected(t *testing.T) {
 		return nil, nil
 	})
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Reduce方法 - 输入数组长度为0

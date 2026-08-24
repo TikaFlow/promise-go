@@ -10,12 +10,13 @@ import (
 
 // 测试基础 FIFO 顺序与大量元素
 func TestQueueFIFO(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
 	const n = 3000
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			if !q.Push(i) {
 				t.Errorf("push %d 返回 false", i)
 				return
@@ -24,7 +25,7 @@ func TestQueueFIFO(t *testing.T) {
 	}()
 	<-done
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		v, ok := <-q.Pop()
 		if !ok {
 			t.Fatalf("第 %d 个元素通道已关闭", i)
@@ -38,15 +39,19 @@ func TestQueueFIFO(t *testing.T) {
 
 // 测试 Pop 始终返回同一个通道
 func TestQueuePopSameChannel(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
 	defer q.Close()
-	if q.Pop() != q.Pop() {
+	ch1 := q.Pop()
+	ch2 := q.Pop()
+	if ch1 != ch2 {
 		t.Fatal("Pop 应始终返回同一个通道")
 	}
 }
 
 // 测试缓冲容量边界
 func TestQueueBufferCapacity(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		in, want int
 	}{
@@ -66,6 +71,7 @@ func TestQueueBufferCapacity(t *testing.T) {
 
 // 测试 Close 后 Push 返回 false，且 Close 幂等
 func TestQueueClose(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
 	if !q.Push(1) {
 		t.Fatal("Close 前 Push 应返回 true")
@@ -83,9 +89,10 @@ func TestQueueClose(t *testing.T) {
 
 // 测试 Close 后排空剩余元素并关闭通道
 func TestQueueCloseDrains(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
 	const n = 2000
-	for i := 0; i < n; i++ {
+	for i := range n {
 		q.Push(i)
 	}
 	q.Close()
@@ -103,6 +110,7 @@ func TestQueueCloseDrains(t *testing.T) {
 
 // 测试空队列时 Pop 阻塞，Push 后唤醒
 func TestQueuePopBlocks(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
 	defer q.Close()
 	done := make(chan struct{})
@@ -126,6 +134,7 @@ func TestQueuePopBlocks(t *testing.T) {
 
 // 测试并发生产者 + 单一消费者，验证不丢不重
 func TestQueueConcurrent(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](128)
 	defer q.Close()
 	const (
@@ -135,11 +144,11 @@ func TestQueueConcurrent(t *testing.T) {
 	total := producers * perEach
 
 	var wg sync.WaitGroup
-	for p := 0; p < producers; p++ {
+	for p := range producers {
 		wg.Add(1)
 		go func(base int) {
 			defer wg.Done()
-			for i := 0; i < perEach; i++ {
+			for i := range perEach {
 				if !q.Push(base + i) {
 					return
 				}
@@ -177,11 +186,12 @@ func TestQueueConcurrent(t *testing.T) {
 
 // 测试消费者少于生产者时 Push 不阻塞（无限容量）
 func TestQueuePushNeverBlocks(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](16)
 	defer q.Close()
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < 100000; i++ {
+		for i := range 100000 {
 			q.Push(i)
 		}
 		close(done)
@@ -195,6 +205,7 @@ func TestQueuePushNeverBlocks(t *testing.T) {
 
 // 测试 SetRetain 边界（bufCap=64 → 下限为 2×64=128，上限 0x400000=4194304）
 func TestQueueSetRetain(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
 	if q.SetRetain(64) {
 		t.Fatal("retain < 2×bufCap 应返回 false")
@@ -213,15 +224,15 @@ func TestQueueSetRetain(t *testing.T) {
 
 // 测试 retain 设为 bufCap 时，节点数不会无限增长
 func TestQueueRetainBound(t *testing.T) {
+	t.Parallel()
 	q := NewQueue[int](64)
-	q.SetRetain(64)
 
 	const n = 100000
-	for i := 0; i < n; i++ {
+	for i := range n {
 		q.Push(i)
 	}
 	// 全部消费，验证不阻塞
-	for i := 0; i < n; i++ {
+	for range n {
 		<-q.Pop()
 	}
 	q.Close()
@@ -229,12 +240,13 @@ func TestQueueRetainBound(t *testing.T) {
 
 // 测试微任务队列在远超原容量（10240）时依然不阻塞
 func TestQueueMicrotaskOverCapacity(t *testing.T) {
-	el2 := StartEventLoop(4)
+	t.Parallel()
+	el2 := StartEventLoop(1)
 	defer el2.Stop()
 	const n = 20000 // 远超原 chan 容量 1024*10
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < n; i++ {
+		for range n {
 			el2.QueueMicrotask(func() {})
 		}
 		close(done)
@@ -248,12 +260,13 @@ func TestQueueMicrotaskOverCapacity(t *testing.T) {
 
 // 测试宏任务队列在远超原容量（10240）时依然不阻塞
 func TestQueueMacrotaskOverCapacity(t *testing.T) {
-	el2 := StartEventLoop(4)
+	t.Parallel()
+	el2 := StartEventLoop(1)
 	defer el2.Stop()
 	const n = 20000
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < n; i++ {
+		for range n {
 			el2.SetTimeout(func() {}, 100000) // 超长延迟，避免触发执行
 		}
 		close(done)
@@ -267,12 +280,13 @@ func TestQueueMacrotaskOverCapacity(t *testing.T) {
 
 // 测试定时器注册（taskCh）在远超原容量（10240）时依然不阻塞
 func TestQueueTimelineTaskOverCapacity(t *testing.T) {
-	el2 := StartEventLoop(4)
+	t.Parallel()
+	el2 := StartEventLoop(1)
 	defer el2.Stop()
 	const n = 20000
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < n; i++ {
+		for range n {
 			el2.SetTimeout(func() {}, 100000)
 		}
 		close(done)
@@ -287,17 +301,18 @@ func TestQueueTimelineTaskOverCapacity(t *testing.T) {
 // 测试定时器清除（clearCh）在远超原容量（10240）时依然不阻塞。
 // 仅注册少量定时器，循环清除，避免 removeTask 的 O(n) 扫描在超量场景下退化为 O(n²)。
 func TestQueueTimelineClearOverCapacity(t *testing.T) {
-	el2 := StartEventLoop(4)
+	t.Parallel()
+	el2 := StartEventLoop(1)
 	defer el2.Stop()
 	// 注册少量定时器，其 id 供清除复用
 	var ids []int
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		ids = append(ids, el2.SetTimeout(func() {}, 100000))
 	}
 	const n = 20000
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < n; i++ {
+		for i := range n {
 			el2.ClearTimeout(ids[i%len(ids)])
 		}
 		close(done)

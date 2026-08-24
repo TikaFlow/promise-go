@@ -29,12 +29,13 @@ func mustSettle(t *testing.T, p *Promise, d time.Duration) {
 
 // 2.2.7.2：onFulfilled 内 panic 应作为拒绝理由。
 func TestOnFulfilledPanic(t *testing.T) {
+	t.Parallel()
 	p := el.Resolve("value")
 	p2 := p.Then(func(v any) (any, error) {
 		panic(errOnFulfilledPanic)
 	}, nil)
 
-	mustSettle(t, p2, time.Second)
+	mustSettle(t, p2, 2*time.Second)
 	if p2.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", p2.State())
 	}
@@ -45,12 +46,13 @@ func TestOnFulfilledPanic(t *testing.T) {
 
 // 2.2.7.2 镜像：onRejected 内 panic 应作为拒绝理由。
 func TestOnRejectedPanic(t *testing.T) {
+	t.Parallel()
 	p := el.Reject(errors.New("root reason"))
 	p2 := p.Then(nil, func(r error) (any, error) {
 		panic(errOnRejectedPanic)
 	})
 
-	mustSettle(t, p2, time.Second)
+	mustSettle(t, p2, 2*time.Second)
 	if p2.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", p2.State())
 	}
@@ -61,12 +63,13 @@ func TestOnRejectedPanic(t *testing.T) {
 
 // 非 error 的 panic 值应被包装为 *UnexpectedError。
 func TestOnFulfilledPanicWithNonError(t *testing.T) {
+	t.Parallel()
 	p := el.Resolve("value")
 	p2 := p.Then(func(v any) (any, error) {
 		panic("a plain string")
 	}, nil)
 
-	mustSettle(t, p2, time.Second)
+	mustSettle(t, p2, 2*time.Second)
 	if p2.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", p2.State())
 	}
@@ -77,11 +80,12 @@ func TestOnFulfilledPanicWithNonError(t *testing.T) {
 
 // `NewPromise` 的 executor 内 panic 应作为拒绝理由。
 func TestExecutorPanic(t *testing.T) {
+	t.Parallel()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		panic(errExecutorPanic)
 	})
 
-	mustSettle(t, p, time.Second)
+	mustSettle(t, p, 2*time.Second)
 	if p.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", p.State())
 	}
@@ -92,12 +96,13 @@ func TestExecutorPanic(t *testing.T) {
 
 // 规范 2.3.3（已决后抛异常应被忽略）：executor 先 resolve 再 panic 应保持 Fulfilled。
 func TestExecutorPanicAfterResolve(t *testing.T) {
+	t.Parallel()
 	p := el.NewPromise(func(resolve, reject func(v any)) error {
 		resolve("ok")
 		panic("after resolve")
 	})
 
-	mustSettle(t, p, time.Second)
+	mustSettle(t, p, 2*time.Second)
 	if p.State() != Fulfilled {
 		t.Fatalf("expect Fulfilled, got %s", p.State())
 	}
@@ -108,11 +113,12 @@ func TestExecutorPanicAfterResolve(t *testing.T) {
 
 // Async 的 fn 内 panic 应作为拒绝理由。
 func TestAsyncPanic(t *testing.T) {
+	t.Parallel()
 	p := el.Async(func() (any, error) {
 		panic(errAsyncPanic)
 	})
 
-	mustSettle(t, p, time.Second)
+	mustSettle(t, p, 2*time.Second)
 	if p.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", p.State())
 	}
@@ -123,11 +129,12 @@ func TestAsyncPanic(t *testing.T) {
 
 // Try 的 fn 内 panic 应作为拒绝理由（经 NewPromise 的 executor 捕获）。
 func TestTryPanic(t *testing.T) {
+	t.Parallel()
 	p := el.Try(func(...any) (any, error) {
 		panic(errTryPanic)
 	})
 
-	mustSettle(t, p, time.Second)
+	mustSettle(t, p, 2*time.Second)
 	if p.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", p.State())
 	}

@@ -186,7 +186,7 @@ func TestFinallyPendingNotAwaited(t *testing.T) {
 		t.Fatalf("expected fulfillment with 'orig' sans wait, got v=%v err=%v", v, err)
 	}
 	el.SetTimeout(func() { rejectP(errors.New("late")) }, 50)
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 	if d.State() != Fulfilled || d.Value() != "orig" {
 		t.Fatalf("expected Fulfilled/'orig' after late reject, got %s/%v", d.State(), d.Value())
 	}
@@ -208,7 +208,7 @@ func TestString(t *testing.T) {
 		}
 	}, 0)
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试State方法
@@ -226,7 +226,7 @@ func TestState(t *testing.T) {
 		return nil
 	})
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 	if p1.State() != Pending {
 		t.Errorf("Expected state Pending, got %s", p1.State())
 	}

@@ -51,11 +51,12 @@ func TestExecutorErrorAfterResolved(t *testing.T) {
 		return nil, nil
 	})
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试nil执行器
 func TestExecutorNil(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("Expected panic for nil executor")
@@ -106,5 +107,5 @@ func TestExecutorThenable(t *testing.T) {
 		}
 	}, 10)
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }

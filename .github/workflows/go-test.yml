@@ -25,4 +25,4 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v ./... -parallel 8

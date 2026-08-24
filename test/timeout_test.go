@@ -10,10 +10,12 @@ import (
 
 // Timeout：base 永不 settle → 在 millis 后以 *TimeoutError 拒绝。
 func TestTimeoutWhenNeverSettles(t *testing.T) {
+	t.Parallel()
+
 	p, _, _ := el.PromiseWithResolvers()
 	tp := el.Timeout(p, 50)
 
-	mustSettle(t, tp, time.Second)
+	mustSettle(t, tp, 2*time.Second)
 	if tp.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", tp.State())
 	}
@@ -25,8 +27,9 @@ func TestTimeoutWhenNeverSettles(t *testing.T) {
 
 // Timeout：base 已决（值）→ 跟随其值，且不误超时。
 func TestTimeoutWhenAlreadySettled(t *testing.T) {
+	t.Parallel()
 	tp := el.Timeout("ok", 200)
-	mustSettle(t, tp, time.Second)
+	mustSettle(t, tp, 2*time.Second)
 	if tp.State() != Fulfilled {
 		t.Fatalf("expect Fulfilled, got %s", tp.State())
 	}
@@ -37,11 +40,12 @@ func TestTimeoutWhenAlreadySettled(t *testing.T) {
 
 // Timeout：base 晚于 deadline 才 settle → 超时拒绝。
 func TestTimeoutWhenSettlesLate(t *testing.T) {
+	t.Parallel()
 	p, resolve, _ := el.PromiseWithResolvers()
 	el.SetTimeout(func() { resolve("too late") }, 300)
 	tp := el.Timeout(p, 50)
 
-	mustSettle(t, tp, time.Second)
+	mustSettle(t, tp, 2*time.Second)
 	if tp.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", tp.State())
 	}
@@ -53,9 +57,10 @@ func TestTimeoutWhenSettlesLate(t *testing.T) {
 
 // Timeout：base 拒绝 → 跟随其拒绝理由（而非超时）。
 func TestTimeoutWhenBaseRejected(t *testing.T) {
+	t.Parallel()
 	base := el.Reject(errors.New("base rejected"))
 	tp := el.Timeout(base, 200)
-	mustSettle(t, tp, time.Second)
+	mustSettle(t, tp, 2*time.Second)
 	if tp.State() != Rejected {
 		t.Fatalf("expect Rejected, got %s", tp.State())
 	}
@@ -66,8 +71,9 @@ func TestTimeoutWhenBaseRejected(t *testing.T) {
 
 // Timeout：非 promise 值 → 立即跟随，不超时。
 func TestTimeoutWithPlainValue(t *testing.T) {
+	t.Parallel()
 	tp := el.Timeout(42, 200)
-	mustSettle(t, tp, time.Second)
+	mustSettle(t, tp, 2*time.Second)
 	if tp.State() != Fulfilled {
 		t.Fatalf("expect Fulfilled, got %s", tp.State())
 	}

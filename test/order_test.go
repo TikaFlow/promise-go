@@ -20,13 +20,11 @@ func TestAsyncCallOrderMacro(t *testing.T) {
 		result += "[B]"
 	}, 50)
 
-	el.SetTimeout(func() {
-		if result != "[A][B][C]" {
-			t.Errorf("Expected result1 '[A][B][C]', got %s", result)
-		}
-	}, 100)
+	time.Sleep(2 * time.Second)
 
-	time.Sleep(time.Second)
+	if result != "[A][B][C]" {
+		t.Errorf("Expected result1 '[A][B][C]', got %s", result)
+	}
 }
 
 // 测试异步调用顺序 - 宏任务 - 有延迟
@@ -49,13 +47,11 @@ func TestAsyncCallOrderMacroDelay(t *testing.T) {
 		result += "[B]"
 	}, 50)
 
-	el.SetTimeout(func() {
-		if result != "[A][C][B]" {
-			t.Errorf("Expected result2 '[A][C][B]', got %s", result)
-		}
-	}, 100)
+	time.Sleep(2 * time.Second)
 
-	time.Sleep(time.Second)
+	if result != "[A][C][B]" {
+		t.Errorf("Expected result2 '[A][C][B]', got %s", result)
+	}
 }
 
 // 测试异步调用顺序 - 微任务
@@ -93,7 +89,7 @@ func TestAsyncCallOrderMicro(t *testing.T) {
 		}
 	}, 0)
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试异步调用顺序 - 混合模式
@@ -298,25 +294,23 @@ func TestAsyncCallOrderMixed(t *testing.T) {
 		result += "-[03]"
 	}, 0)
 
-	el.SetTimeout(func() {
-		part1 := "[01]-[02]-[03]-[04]-[05]-[06]-[07]-[08]-[09]-[10]-[11]-[12]-[13]-[14]-[15]-[16]-[17]-[18]-[19]-[20]-[21]-[22]-[23]-[24]-[25]-[26]-[27]-[28]-[29]-[30]-"
-		part20 := "[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-[37]-"
-		part21 := "[37]-[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-"
-		part22 := "[31]-[32]-[33]-[34]-[37]-[35]-[36]-[38]-[39]-[40]-"
-		part23 := "[31]-[32]-[33]-[34]-[35]-[37]-[36]-[38]-[39]-[40]-"
-		part24 := "[31]-[32]-[33]-[34]-[35]-[36]-[37]-[38]-[39]-[40]-"
-		part25 := "[31]-[32]-[33]-[34]-[35]-[36]-[38]-[37]-[39]-[40]-"
-		part3 := "[41]-[42]-[31]-[32]-[33]-[34]-[42]"
-		expected0 := part1 + part20 + part3
-		expected1 := part1 + part21 + part3
-		expected2 := part1 + part22 + part3
-		expected3 := part1 + part23 + part3
-		expected4 := part1 + part24 + part3
-		expected5 := part1 + part25 + part3
-		if result != expected0 && result != expected1 && result != expected2 && result != expected3 && result != expected4 && result != expected5 {
-			t.Errorf("Expected result is ordered but got:\n%s", result)
-		}
-	}, 360)
+	time.Sleep(2 * time.Second)
 
-	time.Sleep(time.Second)
+	part1 := "[01]-[02]-[03]-[04]-[05]-[06]-[07]-[08]-[09]-[10]-[11]-[12]-[13]-[14]-[15]-[16]-[17]-[18]-[19]-[20]-[21]-[22]-[23]-[24]-[25]-[26]-[27]-[28]-[29]-[30]-"
+	part20 := "[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-[37]-"
+	part21 := "[37]-[31]-[32]-[33]-[34]-[35]-[36]-[38]-[39]-[40]-"
+	part22 := "[31]-[32]-[33]-[34]-[37]-[35]-[36]-[38]-[39]-[40]-"
+	part23 := "[31]-[32]-[33]-[34]-[35]-[37]-[36]-[38]-[39]-[40]-"
+	part24 := "[31]-[32]-[33]-[34]-[35]-[36]-[37]-[38]-[39]-[40]-"
+	part25 := "[31]-[32]-[33]-[34]-[35]-[36]-[38]-[37]-[39]-[40]-"
+	part3 := "[41]-[42]-[31]-[32]-[33]-[34]-[42]"
+	expected0 := part1 + part20 + part3
+	expected1 := part1 + part21 + part3
+	expected2 := part1 + part22 + part3
+	expected3 := part1 + part23 + part3
+	expected4 := part1 + part24 + part3
+	expected5 := part1 + part25 + part3
+	if result != expected0 && result != expected1 && result != expected2 && result != expected3 && result != expected4 && result != expected5 {
+		t.Errorf("Expected result is ordered but got:\n%s", result)
+	}
 }

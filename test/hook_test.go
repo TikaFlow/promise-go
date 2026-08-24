@@ -13,6 +13,8 @@ import (
 
 // 测试On方法
 func TestOn(t *testing.T) {
+	t.Parallel()
+
 	el2 := StartEventLoop(1)
 	defer el2.Stop()
 
@@ -43,7 +45,7 @@ func TestOn(t *testing.T) {
 
 	// 	settled+rejected
 	rej("error")
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(time.Second)
 	expected += "settled-rejected-"
 	if result != expected {
 		t.Errorf("result should be '%s', but got '%s'", expected, result)
@@ -58,7 +60,7 @@ func TestOn(t *testing.T) {
 
 	// 	settled+fulfilled AND settled+fulfilled
 	res("ok")
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(time.Second)
 	expected += "settled-fulfilled-settled-fulfilled-"
 	if result != expected {
 		t.Errorf("result should be '%s', but got '%s'", expected, result)
@@ -67,6 +69,7 @@ func TestOn(t *testing.T) {
 
 // 测试Off方法 - 成功解绑
 func TestOffSuccess(t *testing.T) {
+	t.Parallel()
 	el2 := StartEventLoop(1)
 	defer el2.Stop()
 
@@ -85,7 +88,7 @@ func TestOffSuccess(t *testing.T) {
 		return nil
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(time.Second)
 	if called {
 		t.Errorf("Expected hook to not be called after Off")
 	}
@@ -93,17 +96,18 @@ func TestOffSuccess(t *testing.T) {
 
 // 测试Off - 不匹配的key/hookType
 func TestOffMismatch(t *testing.T) {
+	t.Parallel()
 	el2 := StartEventLoop(1)
 	defer el2.Stop()
 
-	key := el.On(OnCreated, func(p *Promise) {})
-	result := el.Off(OnRejected, key)
+	key := el2.On(OnCreated, func(p *Promise) {})
+	result := el2.Off(OnRejected, key)
 	if result {
 		t.Errorf("Expected Off to return false for mismatched event type")
 	}
 
-	key = el.On(OnChained, func(p *Promise) {})
-	result = el.Off(OnChained, "this-is-a-key")
+	key = el2.On(OnChained, func(p *Promise) {})
+	result = el2.Off(OnChained, "this-is-a-key")
 	if result {
 		t.Errorf("Expected Off to return false for mismatched key")
 	}

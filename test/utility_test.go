@@ -56,7 +56,7 @@ func TestAwaitTimeout(t *testing.T) {
 		t.Errorf("Expected error 'TimeoutError: await timeout', got %s", err)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Await - timeout不是正数
@@ -115,7 +115,7 @@ func TestDelay(t *testing.T) {
 		t.Errorf("Expected 'success', got %s", res)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 // 测试Delay函数 - 已拒绝的promise

@@ -7,6 +7,7 @@ import (
 
 // 回归：对未决 promise 注册超过旧有 128 缓冲上限的 then，不应死锁，且应全部、按序执行（规范 2.2.6）。
 func TestManyThenOnPendingPromise(t *testing.T) {
+	t.Parallel()
 	const n = 130 // 略大于旧有缓冲上限 128（修复后第 129 次注册不再阻塞）
 	p, resolve, _ := el.PromiseWithResolvers()
 
