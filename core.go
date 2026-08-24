@@ -9,7 +9,7 @@ Package promise 提供了 [Promise] 的 Golang 实现，其行为符合 [Promise
 
 为了统一术语、避免歧义，本包中所有注释，对术语进行以下统一、规范描述：
   - [Pending]: 描述为 [Pending] 或“未决”
-  - [Settled]: 描述为 [Settled] 或 “已决”，注意与 [Fulfilled] 区分
+  - Settled: 描述为 “已决”，注意与 [Fulfilled] 区分（实现中不能使用此状态，必须明确为 [Fulfilled] 或 [Rejected]）
   - [Fulfilled]: 描述为 [Fulfilled] 或“解决”
   - [Rejected]: 描述为 [Rejected] 或“拒绝”
   - 除非特别说明，注释中的“返回 err”即代指 err 不为 nil，“未返回 err”即代指 err 为 nil
@@ -30,11 +30,6 @@ import (
 // Pending 表示 [Promise] 初始状态，其状态待定，可能转换为 [Fulfilled] 或 [Rejected]
 const Pending = "pending"
 
-// Settled [Promise] 已经确定结果，状态不能再发生变化
-//
-// 注意：这是一个概念上的状态，实现中不能使用此状态，必须明确为 [Fulfilled] 或 [Rejected]
-const Settled = "[THIS_SHOULD_NEVER_BE_USED]"
-
 // Fulfilled 表示 [Promise] 已解决，状态不能再发生变化
 const Fulfilled = "fulfilled"
 
@@ -52,7 +47,7 @@ type ThenCallback func(any) (v any, err error)
 // 返回值与 [ThenCallback] 相同
 type CatchCallback func(error) (v any, err error)
 
-// FinallyCallback [Promise] 已决/[Settled] 时的回调函数
+// FinallyCallback [Promise] 已决（Settled）时的回调函数
 // 它不接收任何参数，通常也不需要返回任何值（将被忽略），因为新的 [Promise] 将沿用原 [Promise] 的状态和结果
 //
 // 特殊情况：
