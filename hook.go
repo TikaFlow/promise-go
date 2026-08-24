@@ -33,28 +33,38 @@ type promiseHooks struct {
 	hooksLock         sync.RWMutex
 }
 
-// 调用具体钩子
-func (hk *promiseHooks) callHook(slice []string, p *Promise) {
-	for _, key := range slice {
-		hk.hooks[key](p)
-	}
-}
-
-// 通过钩子类型调用钩子
+// 通过钩子类型调用钩子。
+//
+// 钩子函数在锁外执行：先在锁内按 key 收集函数快照，再释放读锁、逐个执行。
+// 因此钩子内可安全调用 [EventLoop.On] / [EventLoop.Off]（二者需要写锁），
+// 不会因"持有读锁时尝试升级为写锁"而自死锁。
 func (hk *promiseHooks) callHooks(event HookType, p *Promise) {
 	hk.hooksLock.RLock()
-	defer hk.hooksLock.RUnlock()
-
+	// 锁内只读取：从 map 收集钩子引用。Off 在快照之前发生则本钩子不会触发；
+	// 在快照之后发生则本钩子仍会执行一次（可接受的竞态）。
+	var keys []string
 	switch event {
 	case OnCreated:
-		hk.callHook(hk.createdHookKeys, p)
+		keys = hk.createdHookKeys
 	case OnChained:
-		hk.callHook(hk.chainedHookKeys, p)
+		keys = hk.chainedHookKeys
 	case OnFulfilled:
-		hk.callHook(hk.fulfilledHookKeys, p)
+		keys = hk.fulfilledHookKeys
 	case OnRejected:
-		hk.callHook(hk.rejectedHookKeys, p)
+		keys = hk.rejectedHookKeys
 	case OnSettled:
-		hk.callHook(hk.settledHookKeys, p)
+		keys = hk.settledHookKeys
+	}
+
+	fns := make([]func(p *Promise), 0, len(keys))
+	for _, key := range keys {
+		if fn, ok := hk.hooks[key]; ok {
+			fns = append(fns, fn)
+		}
+	}
+	hk.hooksLock.RUnlock()
+
+	for _, fn := range fns {
+		fn(p)
 	}
 }
