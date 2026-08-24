@@ -1,6 +1,7 @@
 package promise
 
 import (
+	"sync"
 	"sync/atomic"
 
 	pool "github.com/TikaFlow/worker-pool"
@@ -21,21 +22,19 @@ type EventLoop struct {
 	timeline       *timeLine
 	hooks          *promiseHooks
 	done           chan struct{}
+	stopOnce       sync.Once
 }
 
 // 执行所有任务队列中的任务
 func (el *EventLoop) flushTasks() {
-	for _, task := range el.timeline.tasks {
-		el.timeline.queueMacrotask(task.callback)
-	}
-	// 关闭后 feed 会排空剩余任务并关闭 pop 通道，range 随之结束
-	el.macrotaskQueue.Close()
-	el.microtaskQueue.Close()
 	for task := range el.microtaskQueue.Pop() {
 		task()
 	}
 	for task := range el.macrotaskQueue.Pop() {
 		task()
+	}
+	for _, task := range el.timeline.tasks {
+		task.callback()
 	}
 }
 
@@ -803,12 +802,18 @@ func (el *EventLoop) Some(num int, inputs ...any) *Promise {
 }
 
 // Stop 停止事件循环，将会等待其管理的异步任务完成才会返回
+//
+// 注意：Stop 会阻塞等待 looper 关闭，因此禁止在事件循环内（如 Then/定时器回调中）调用
 func (el *EventLoop) Stop() {
-	el.flushTasks()
-	close(el.done)
-	_ = el.looper.Close()
-	_ = el.scheduler.Close()
-	_ = el.worker.Close()
+	el.stopOnce.Do(func() {
+		close(el.done)
+		el.microtaskQueue.Close()
+		el.macrotaskQueue.Close()
+		_ = el.worker.Close()
+		_ = el.scheduler.Close()
+		_ = el.looper.Close()
+		el.flushTasks()
+	})
 }
 
 // Try 接受一个任意类型的回调函数，并将其结果封装成一个 [Promise]，详见 [MDN]。
