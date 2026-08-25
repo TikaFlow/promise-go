@@ -91,8 +91,8 @@ func StartEventLoop(workerCount int) *EventLoop {
 		nextID:    0,
 		tasks:     make([]*timedTask, 0, 1024*10),
 		timer:     time.NewTimer(100 * 365 * 24 * time.Hour),
-		taskCh:    make(chan *timedTask, 1024*10),
-		clearCh:   make(chan int, 1024*10),
+		taskCh:    NewQueue[*timedTask](taskQueueBufSize),
+		clearCh:   NewQueue[int](taskQueueBufSize),
 		eventLoop: el,
 	}
 	el.hooks = &promiseHooks{

@@ -3,19 +3,19 @@ package promise
 // ClearInterval 清除由 [EventLoop.SetInterval] 函数创建的定时器
 //   - id 定时器ID
 func (el *EventLoop) ClearInterval(id int) {
-	if id == -1 {
+	if id == invalidTimerID {
 		return
 	}
-	el.timeline.clearCh <- id
+	el.timeline.clearCh.Push(id)
 }
 
 // ClearTimeout 清除由 [EventLoop.SetTimeout] 函数创建的定时器
 //   - id 定时器ID
 func (el *EventLoop) ClearTimeout(id int) {
-	if id == -1 {
+	if id == invalidTimerID {
 		return
 	}
-	el.timeline.clearCh <- id
+	el.timeline.clearCh.Push(id)
 }
 
 // Delay 返回一个新的 [Promise]，其状态会在延迟时间后被解决
@@ -72,7 +72,7 @@ func (el *EventLoop) Timeout(prom any, millis int64) *Promise {
 // 定时器 ID，可通过调用 [EventLoop.ClearInterval] 函数来清除定时器
 func (el *EventLoop) SetInterval(callback func(), millis int64) int {
 	if callback == nil {
-		return -1
+		return invalidTimerID
 	}
 	return el.timeline.produceTask(callback, millis, true)
 }
@@ -86,7 +86,7 @@ func (el *EventLoop) SetInterval(callback func(), millis int64) int {
 // 定时器 ID，可通过调用 [EventLoop.ClearTimeout] 函数来清除定时器
 func (el *EventLoop) SetTimeout(callback func(), millis int64) int {
 	if callback == nil {
-		return -1
+		return invalidTimerID
 	}
 	return el.timeline.produceTask(callback, millis, false)
 }

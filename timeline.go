@@ -5,14 +5,17 @@ import (
 	"time"
 )
 
+// invalidTimerID 无效定时器 ID：调度失败或事件循环已停止（队列关闭）时返回/传入。
+const invalidTimerID = -1
+
 // 时间线类型，用于调度宏任务
 type timeLine struct {
 	nextID    int
 	idLock    sync.Mutex
 	tasks     []*timedTask
 	timer     *time.Timer
-	taskCh    chan *timedTask
-	clearCh   chan int
+	taskCh    *Queue[*timedTask]
+	clearCh   *Queue[int]
 	eventLoop *EventLoop
 }
 
@@ -71,7 +74,7 @@ func (tl *timeLine) appendTask(task *timedTask) {
 
 // 移除一个待调度的任务
 func (tl *timeLine) removeTask(id int) {
-	if id == -1 {
+	if id == invalidTimerID {
 		return
 	}
 
@@ -90,7 +93,7 @@ func (tl *timeLine) removeTask(id int) {
 // 构造一个定时任务并添加到调度队列
 func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int {
 	if callback == nil {
-		return -1
+		return invalidTimerID
 	}
 
 	if millis < 0 {
@@ -109,7 +112,10 @@ func (tl *timeLine) produceTask(callback func(), millis int64, repeat bool) int 
 		callback: callback,
 		repeat:   repeat,
 	}
-	tl.taskCh <- task
+
+	if !tl.taskCh.Push(task) {
+		return invalidTimerID
+	}
 	return id
 }
 
@@ -138,15 +144,21 @@ func (tl *timeLine) consumeTask() {
 func (tl *timeLine) run() {
 	for {
 		select {
-		case task := <-tl.taskCh:
+		case task, ok := <-tl.taskCh.Pop():
+			if !ok {
+				return
+			}
 			tl.appendTask(task)
-		case id := <-tl.clearCh:
+		case id, ok := <-tl.clearCh.Pop():
+			if !ok {
+				return
+			}
 			tl.removeTask(id)
 		case <-tl.timer.C:
 			tl.consumeTask()
 		case <-tl.eventLoop.done:
-			close(tl.taskCh)
-			close(tl.clearCh)
+			tl.taskCh.Close()
+			tl.clearCh.Close()
 			// 关闭定时器
 			if !tl.timer.Stop() {
 				select {
