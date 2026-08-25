@@ -19,7 +19,7 @@ type EventLoop struct {
 	scheduler      pool.Pool
 	worker         pool.Pool
 	timeline       *timeLine
-	hooks          *promiseHooks
+	hooks          *hooks
 	done           chan struct{}
 	stopOnce       sync.Once
 }
@@ -113,87 +113,87 @@ func (el *EventLoop) pushTask(fn func()) {
 	el.worker.Add(fn)
 }
 
-// Off 解绑一个钩子函数
-//   - event 钩子事件类型，可选值为 [ [OnCreated] | [OnChained] | [OnFulfilled] | [OnRejected] | [OnSettled] ]
-//   - key 要解绑的钩子函数的唯一标识，由 [EventLoop.On] 方法返回
+// OffPromise 解绑一个钩子函数
+//   - event 钩子事件类型，可选值为 [ [PromiseCreated] | [PromiseChained] | [PromiseFulfilled] | [PromiseRejected] | [PromiseSettled] ]
+//   - key 要解绑的钩子函数的唯一标识，由 [EventLoop.OnPromise] 方法返回
 //
 // event 与 key 必须匹配，否则将解绑失败
 //
 // # return
 //
 // 表明解绑是否成功的 bool 值
-func (el *EventLoop) Off(event HookType, key string) bool {
+func (el *EventLoop) OffPromise(event HookType, key string) bool {
 	if key == "" {
 		return false
 	}
 
-	el.hooks.hooksLock.Lock()
-	defer el.hooks.hooksLock.Unlock()
+	el.hooks.promiseHooksLock.Lock()
+	defer el.hooks.promiseHooksLock.Unlock()
 
 	var targetSlice *[]string
 
 	switch event {
-	case OnCreated:
-		targetSlice = &el.hooks.createdHookKeys
-	case OnChained:
-		targetSlice = &el.hooks.chainedHookKeys
-	case OnFulfilled:
-		targetSlice = &el.hooks.fulfilledHookKeys
-	case OnRejected:
-		targetSlice = &el.hooks.rejectedHookKeys
-	case OnSettled:
-		targetSlice = &el.hooks.settledHookKeys
+	case PromiseCreated:
+		targetSlice = &el.hooks.promiseCreatedHookKeys
+	case PromiseChained:
+		targetSlice = &el.hooks.promiseChainedHookKeys
+	case PromiseFulfilled:
+		targetSlice = &el.hooks.promiseFulfilledHookKeys
+	case PromiseRejected:
+		targetSlice = &el.hooks.promiseRejectedHookKeys
+	case PromiseSettled:
+		targetSlice = &el.hooks.promiseSettledHookKeys
 	}
 
 	if targetSlice == nil {
 		return false
 	}
 	if deleteFromSlice(targetSlice, key) {
-		delete(el.hooks.hooks, key)
+		delete(el.hooks.promiseHooks, key)
 		return true
 	}
 
 	return false
 }
 
-// On 绑定一个钩子函数
-//   - event 钩子事件类型，可选值为 [ [OnCreated] | [OnChained] | [OnFulfilled] | [OnRejected] | [OnSettled] ]
+// OnPromise 绑定一个钩子函数
+//   - event 钩子事件类型，可选值为 [ [PromiseCreated] | [PromiseChained] | [PromiseFulfilled] | [PromiseRejected] | [PromiseSettled] ]
 //   - hook 钩子函数，当事件触发时调用，并以触发该事件的 [Promise] 实例作为参数
 //
 // # return
 //
 // 绑定成功返回钩子函数的唯一标识，可用于后续解绑钩子函数，失败返回空字符串
-func (el *EventLoop) On(event HookType, hook func(p *Promise)) string {
+func (el *EventLoop) OnPromise(event HookType, hook func(p *Promise)) string {
 	if hook == nil {
 		return ""
 	}
 
-	el.hooks.hooksLock.Lock()
-	defer el.hooks.hooksLock.Unlock()
+	el.hooks.promiseHooksLock.Lock()
+	defer el.hooks.promiseHooksLock.Unlock()
 
 	var exist = true
 	var key string
 	for exist {
 		key = string(event) + randString(16)
-		_, exist = el.hooks.hooks[key]
+		_, exist = el.hooks.promiseHooks[key]
 	}
 
 	switch event {
-	case OnCreated:
-		el.hooks.createdHookKeys = append(el.hooks.createdHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnChained:
-		el.hooks.chainedHookKeys = append(el.hooks.chainedHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnFulfilled:
-		el.hooks.fulfilledHookKeys = append(el.hooks.fulfilledHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnRejected:
-		el.hooks.rejectedHookKeys = append(el.hooks.rejectedHookKeys, key)
-		el.hooks.hooks[key] = hook
-	case OnSettled:
-		el.hooks.settledHookKeys = append(el.hooks.settledHookKeys, key)
-		el.hooks.hooks[key] = hook
+	case PromiseCreated:
+		el.hooks.promiseCreatedHookKeys = append(el.hooks.promiseCreatedHookKeys, key)
+		el.hooks.promiseHooks[key] = hook
+	case PromiseChained:
+		el.hooks.promiseChainedHookKeys = append(el.hooks.promiseChainedHookKeys, key)
+		el.hooks.promiseHooks[key] = hook
+	case PromiseFulfilled:
+		el.hooks.promiseFulfilledHookKeys = append(el.hooks.promiseFulfilledHookKeys, key)
+		el.hooks.promiseHooks[key] = hook
+	case PromiseRejected:
+		el.hooks.promiseRejectedHookKeys = append(el.hooks.promiseRejectedHookKeys, key)
+		el.hooks.promiseHooks[key] = hook
+	case PromiseSettled:
+		el.hooks.promiseSettledHookKeys = append(el.hooks.promiseSettledHookKeys, key)
+		el.hooks.promiseHooks[key] = hook
 	}
 
 	return key
@@ -212,4 +212,69 @@ func (el *EventLoop) Stop() {
 		_ = el.looper.Close()
 		el.flushTasks()
 	})
+}
+
+// OffPanic 解绑一个 panic 钩子函数
+//   - event 钩子事件类型，可选值为 [ [TimerPanic] ]
+//   - key 要解绑的钩子函数的唯一标识，由 [EventLoop.OnPanic] 方法返回
+//
+// event 与 key 必须匹配，否则将解绑失败
+//
+// # return
+//
+// 表明解绑是否成功的 bool 值
+func (el *EventLoop) OffPanic(event HookType, key string) bool {
+	if key == "" {
+		return false
+	}
+
+	el.hooks.panicHooksLock.Lock()
+	defer el.hooks.panicHooksLock.Unlock()
+
+	var targetSlice *[]string
+	switch event {
+	case TimerPanic:
+		targetSlice = &el.hooks.timerPanicHookKeys
+	}
+
+	if targetSlice == nil {
+		return false
+	}
+	if deleteFromSlice(targetSlice, key) {
+		delete(el.hooks.panicHooks, key)
+		return true
+	}
+
+	return false
+}
+
+// OnPanic 绑定一个 panic 钩子函数
+//   - event 钩子事件类型，可选值为 [ [TimerPanic] ]
+//   - hook 钩子函数，当对应 panic 发生时调用，接收 panic 值
+//
+// # return
+//
+// 绑定成功返回钩子函数的唯一标识，可用于后续解绑钩子函数，失败返回空字符串
+func (el *EventLoop) OnPanic(event HookType, hook func(r any)) string {
+	if hook == nil {
+		return ""
+	}
+
+	el.hooks.panicHooksLock.Lock()
+	defer el.hooks.panicHooksLock.Unlock()
+
+	var exist = true
+	var key string
+	for exist {
+		key = string(event) + randString(16)
+		_, exist = el.hooks.panicHooks[key]
+	}
+
+	switch event {
+	case TimerPanic:
+		el.hooks.timerPanicHookKeys = append(el.hooks.timerPanicHookKeys, key)
+		el.hooks.panicHooks[key] = hook
+	}
+
+	return key
 }

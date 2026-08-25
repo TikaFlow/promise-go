@@ -43,8 +43,8 @@ func resolvePromise(prom *Promise, value any) {
 	prom.value = value
 	close(prom.settled)
 	prom.dataLock.Unlock()
-	prom.eventLoop.hooks.callHooks(OnSettled, prom)
-	prom.eventLoop.hooks.callHooks(OnFulfilled, prom)
+	prom.eventLoop.hooks.callPromiseHooks(PromiseSettled, prom)
+	prom.eventLoop.hooks.callPromiseHooks(PromiseFulfilled, prom)
 	flushHandlers(prom)
 }
 
@@ -73,8 +73,8 @@ func rejectPromise(prom *Promise, r any) {
 	prom.reason = reason
 	close(prom.settled)
 	prom.dataLock.Unlock()
-	prom.eventLoop.hooks.callHooks(OnSettled, prom)
-	prom.eventLoop.hooks.callHooks(OnRejected, prom)
+	prom.eventLoop.hooks.callPromiseHooks(PromiseSettled, prom)
+	prom.eventLoop.hooks.callPromiseHooks(PromiseRejected, prom)
 	flushHandlers(prom)
 }
 

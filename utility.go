@@ -96,7 +96,7 @@ func (el *EventLoop) NewPromise(exec Executor) *Promise {
 		settled:         make(chan struct{}),
 		eventLoop:       el,
 	}
-	el.hooks.callHooks(OnCreated, prom)
+	el.hooks.callPromiseHooks(PromiseCreated, prom)
 
 	res := func(data any) {
 		prom.resolved.Do(func() {

@@ -19,19 +19,19 @@ func TestOn(t *testing.T) {
 	defer el2.Stop()
 
 	result := ""
-	_ = el2.On(OnCreated, func(p *Promise) {
+	_ = el2.OnPromise(PromiseCreated, func(p *Promise) {
 		result += "created-"
 	})
-	_ = el2.On(OnSettled, func(p *Promise) {
+	_ = el2.OnPromise(PromiseSettled, func(p *Promise) {
 		result += "settled-"
 	})
-	_ = el2.On(OnFulfilled, func(p *Promise) {
+	_ = el2.OnPromise(PromiseFulfilled, func(p *Promise) {
 		result += "fulfilled-"
 	})
-	_ = el2.On(OnRejected, func(p *Promise) {
+	_ = el2.OnPromise(PromiseRejected, func(p *Promise) {
 		result += "rejected-"
 	})
-	_ = el2.On(OnChained, func(p *Promise) {
+	_ = el2.OnPromise(PromiseChained, func(p *Promise) {
 		result += "chained-"
 	})
 
@@ -74,11 +74,11 @@ func TestOffSuccess(t *testing.T) {
 	defer el2.Stop()
 
 	called := false
-	key := el2.On(OnCreated, func(p *Promise) {
+	key := el2.OnPromise(PromiseCreated, func(p *Promise) {
 		called = true
 	})
 
-	result := el2.Off(OnCreated, key)
+	result := el2.OffPromise(PromiseCreated, key)
 	if !result {
 		t.Errorf("Expected Off to return true")
 	}
@@ -100,14 +100,14 @@ func TestOffMismatch(t *testing.T) {
 	el2 := StartEventLoop(1)
 	defer el2.Stop()
 
-	key := el2.On(OnCreated, func(p *Promise) {})
-	result := el2.Off(OnRejected, key)
+	key := el2.OnPromise(PromiseCreated, func(p *Promise) {})
+	result := el2.OffPromise(PromiseRejected, key)
 	if result {
 		t.Errorf("Expected Off to return false for mismatched event type")
 	}
 
-	key = el2.On(OnChained, func(p *Promise) {})
-	result = el2.Off(OnChained, "this-is-a-key")
+	key = el2.OnPromise(PromiseChained, func(p *Promise) {})
+	result = el2.OffPromise(PromiseChained, "this-is-a-key")
 	if result {
 		t.Errorf("Expected Off to return false for mismatched key")
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 // 回归：Await 在基 promise 先于超时已决时，应清理超时定时器，避免 wait promise
-// 在超时点被无谓地拒绝（触发 OnRejected 等副作用）。
+// 在超时点被无谓地拒绝（触发 PromiseRejected 等副作用）。
 func TestAwaitClearsTimeoutWhenBaseSettlesFirst(t *testing.T) {
 	t.Parallel()
 	// 使用独立事件循环，避免钩子影响其他测试（与 hook_test 同约定）。
@@ -17,7 +17,7 @@ func TestAwaitClearsTimeoutWhenBaseSettlesFirst(t *testing.T) {
 	defer el2.Stop()
 
 	var rejected atomic.Bool
-	el2.On(OnRejected, func(*Promise) {
+	el2.OnPromise(PromiseRejected, func(*Promise) {
 		rejected.Store(true)
 	})
 

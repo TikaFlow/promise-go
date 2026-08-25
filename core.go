@@ -95,13 +95,15 @@ func StartEventLoop(workerCount int) *EventLoop {
 		clearCh:   NewQueue[int](taskQueueBufSize),
 		eventLoop: el,
 	}
-	el.hooks = &promiseHooks{
-		createdHookKeys:   make([]string, 0, 64),
-		chainedHookKeys:   make([]string, 0, 64),
-		fulfilledHookKeys: make([]string, 0, 64),
-		rejectedHookKeys:  make([]string, 0, 64),
-		settledHookKeys:   make([]string, 0, 64),
-		hooks:             make(map[string]func(p *Promise)),
+	el.hooks = &hooks{
+		promiseCreatedHookKeys:   make([]string, 0, 64),
+		promiseChainedHookKeys:   make([]string, 0, 64),
+		promiseFulfilledHookKeys: make([]string, 0, 64),
+		promiseRejectedHookKeys:  make([]string, 0, 64),
+		promiseSettledHookKeys:   make([]string, 0, 64),
+		promiseHooks:             make(map[string]func(p *Promise)),
+		timerPanicHookKeys:       make([]string, 0, 64),
+		panicHooks:               make(map[string]func(r any)),
 	}
 
 	el.looper.Add(el.run)

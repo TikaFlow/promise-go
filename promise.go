@@ -78,7 +78,7 @@ func (prom *Promise) Then(onFulfilled ThenCallback, onRejected CatchCallback) *P
 	prom2 := prom.eventLoop.NewPromise(func(resolve, reject func(v any)) error {
 		return nil
 	})
-	prom.eventLoop.hooks.callHooks(OnChained, prom)
+	prom.eventLoop.hooks.callPromiseHooks(PromiseChained, prom)
 	prom.addHandler(&handler{
 		onFulfilled: onFulfilled,
 		onRejected:  onRejected,
