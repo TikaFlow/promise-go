@@ -10,6 +10,7 @@ import (
 
 // 2.2.3: 若 onRejected 是函数，则在 promise rejected 后以其理由为参调用。
 func TestAplus2_2_3(t *testing.T) {
+	t.Parallel()
 	// 2.2.3.1 with rejection reason
 	testRejected(t, sentinel, func(t *testing.T, p *Promise) *Promise {
 		return expectRejected(t, p, sentinel)
@@ -17,6 +18,7 @@ func TestAplus2_2_3(t *testing.T) {
 
 	// 2.2.3.2 not before rejection
 	t.Run("2.2.3.2 rejected after a delay", func(t *testing.T) {
+		t.Parallel()
 		p, _, reject := deferred()
 		isRejected := false
 		tail := p.Then(nil, func(r error) (any, error) {
@@ -33,6 +35,7 @@ func TestAplus2_2_3(t *testing.T) {
 	})
 
 	t.Run("2.2.3.2 never rejected", func(t *testing.T) {
+		t.Parallel()
 		p, _, _ := deferred()
 		var onRejectedCalled atomic.Bool
 		p.Then(nil, func(r error) (any, error) {
@@ -47,6 +50,7 @@ func TestAplus2_2_3(t *testing.T) {
 
 	// 2.2.3.3 not more than once
 	t.Run("2.2.3.3 already-rejected", func(t *testing.T) {
+		t.Parallel()
 		times := 0
 		tail := rejected(dummy).Then(nil, func(r error) (any, error) {
 			times++
@@ -59,6 +63,7 @@ func TestAplus2_2_3(t *testing.T) {
 	})
 
 	t.Run("2.2.3.3 reject pending more than once, immediately", func(t *testing.T) {
+		t.Parallel()
 		p, _, reject := deferred()
 		times := 0
 		tail := p.Then(nil, func(r error) (any, error) {
@@ -74,6 +79,7 @@ func TestAplus2_2_3(t *testing.T) {
 	})
 
 	t.Run("2.2.3.3 reject pending more than once, delayed", func(t *testing.T) {
+		t.Parallel()
 		p, _, reject := deferred()
 		times := 0
 		tail := p.Then(nil, func(r error) (any, error) {
@@ -91,6 +97,7 @@ func TestAplus2_2_3(t *testing.T) {
 	})
 
 	t.Run("2.2.3.3 reject pending more than once, immediately then delayed", func(t *testing.T) {
+		t.Parallel()
 		p, _, reject := deferred()
 		times := 0
 		tail := p.Then(nil, func(r error) (any, error) {
@@ -106,6 +113,7 @@ func TestAplus2_2_3(t *testing.T) {
 	})
 
 	t.Run("2.2.3.3 multiple then calls spaced apart", func(t *testing.T) {
+		t.Parallel()
 		// adjusted（时间型）：固定延时结算后读原子计数。
 		p, _, reject := deferred()
 		var times [3]atomic.Int32
@@ -127,6 +135,7 @@ func TestAplus2_2_3(t *testing.T) {
 	})
 
 	t.Run("2.2.3.3 then interleaved with rejection", func(t *testing.T) {
+		t.Parallel()
 		p, _, reject := deferred()
 		var times [2]atomic.Int32
 		p.Then(nil, func(r error) (any, error) { record(t, times[:], 0); return nil, nil })

@@ -8,6 +8,7 @@ import (
 // 本库刻意只支持 thenable === promise（仅采纳自身 *Promise，见 2.3.2）；
 // 不读取任意对象的 .then，无 getter/访问器语义。全部 N/A。
 func TestAplus2_3_3(t *testing.T) {
+	t.Parallel()
 	skipNA(t, "2.3.3.1 retrieving x.then (getter counted once)", 6,
 		"Go 无属性访问器/getter，且本库不读取任意对象 .then")
 	skipNA(t, "2.3.3.2 retrieving x.then throws", 22,

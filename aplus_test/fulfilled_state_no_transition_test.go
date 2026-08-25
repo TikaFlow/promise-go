@@ -9,6 +9,7 @@ import (
 
 // 2.1.2: 当已 fulfilled 后，promise 不得再迁移到任何其他状态。
 func TestAplus2_1_2(t *testing.T) {
+	t.Parallel()
 	testFulfilled(t, dummy, func(t *testing.T, p *Promise) *Promise {
 		return p.Then(func(v any) (any, error) { return nil, nil },
 			func(r error) (any, error) {
@@ -18,6 +19,7 @@ func TestAplus2_1_2(t *testing.T) {
 	})
 
 	t.Run("trying to fulfill then immediately reject", func(t *testing.T) {
+		t.Parallel()
 		// adjusted: resolve then reject（reject 因 sync.Once 被忽略）
 		fulfillThenReject(t, func(resolve, reject func(any)) {
 			resolve(dummy)
@@ -26,6 +28,7 @@ func TestAplus2_1_2(t *testing.T) {
 	})
 
 	t.Run("trying to fulfill then reject, delayed", func(t *testing.T) {
+		t.Parallel()
 		fulfillThenReject(t, func(resolve, reject func(any)) {
 			el.SetTimeout(func() {
 				resolve(dummy)
@@ -35,6 +38,7 @@ func TestAplus2_1_2(t *testing.T) {
 	})
 
 	t.Run("trying to fulfill immediately then reject delayed", func(t *testing.T) {
+		t.Parallel()
 		fulfillThenReject(t, func(resolve, reject func(any)) {
 			resolve(dummy)
 			el.SetTimeout(func() { reject(dummy) }, 50)

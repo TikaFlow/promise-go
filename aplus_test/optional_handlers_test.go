@@ -7,7 +7,9 @@ import (
 
 // 2.2.1: onFulfilled / onRejected 均为可选参数，非函数则忽略（Go 中只能用 nil 表示“非函数”）。
 func TestAplus2_2_1(t *testing.T) {
+	t.Parallel()
 	t.Run("2.2.1.1 onFulfilled not a function, directly-rejected promise", func(t *testing.T) {
+		t.Parallel()
 		var onRejectedCalled atomic.Bool
 		tail := rejected(dummy).Then(nil, func(r error) (any, error) {
 			onRejectedCalled.Store(true)
@@ -20,6 +22,7 @@ func TestAplus2_2_1(t *testing.T) {
 	})
 
 	t.Run("2.2.1.1 onFulfilled not a function, rejected then chained off", func(t *testing.T) {
+		t.Parallel()
 		p := rejected(dummy).Then(func(any) (any, error) { return nil, nil }, nil)
 		var onRejectedCalled atomic.Bool
 		tail := p.Then(nil, func(r error) (any, error) {
@@ -33,6 +36,7 @@ func TestAplus2_2_1(t *testing.T) {
 	})
 
 	t.Run("2.2.1.2 onRejected not a function, directly-fulfilled promise", func(t *testing.T) {
+		t.Parallel()
 		var onFulfilledCalled atomic.Bool
 		tail := resolved(dummy).Then(func(v any) (any, error) {
 			onFulfilledCalled.Store(true)
@@ -45,6 +49,7 @@ func TestAplus2_2_1(t *testing.T) {
 	})
 
 	t.Run("2.2.1.2 onRejected not a function, fulfilled then chained off", func(t *testing.T) {
+		t.Parallel()
 		p := resolved(dummy).Then(nil, func(r error) (any, error) { return nil, nil })
 		var onFulfilledCalled atomic.Bool
 		tail := p.Then(func(v any) (any, error) {

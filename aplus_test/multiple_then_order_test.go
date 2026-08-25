@@ -13,11 +13,14 @@ import (
 // 当 promise 被 rejected 时，所有 onRejected 按调用 then 的顺序执行。
 // 其中某个回调抛错不应影响其余兄弟回调；各分支链可自行产生不同的 fulfillment 值。
 func TestAplus2_2_6(t *testing.T) {
+	t.Parallel()
 	//
 	// 2.2.6.1 当 promise 被 fulfilled 时，所有 onFulfilled 按 then 注册顺序执行
 	//
 	t.Run("2.2.6.1", func(t *testing.T) {
+		t.Parallel()
 		t.Run("multiple boring fulfillment handlers", func(t *testing.T) {
+			t.Parallel()
 			testFulfilled(t, sentinel, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				// adjusted: sinon.stub().returns(other) → 记录 id 并返回 other 的处理器
@@ -55,6 +58,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("multiple fulfillment handlers, one of which throws", func(t *testing.T) {
+			t.Parallel()
 			testFulfilled(t, sentinel, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				handler := func(id string) func(any) (any, error) {
@@ -95,6 +99,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("results in multiple branching chains with their own fulfillment values", func(t *testing.T) {
+			t.Parallel()
 			testFulfilled(t, dummy, func(t *testing.T, p *Promise) *Promise {
 				// adjusted: callbackAggregator(3, done) → 计数凑满 3 后 resolve 组合 promise
 				combiner, resolveCombiner, _ := deferred()
@@ -134,6 +139,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("'onFulfilled' handlers are called in the original order", func(t *testing.T) {
+			t.Parallel()
 			testFulfilled(t, dummy, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				// adjusted: sinon.spy(handlerN) → 记录 id 的处理器
@@ -160,6 +166,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("even when one handler is added inside another handler", func(t *testing.T) {
+			t.Parallel()
 			testFulfilled(t, dummy, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				handler := func(id string) func(any) (any, error) {
@@ -198,7 +205,9 @@ func TestAplus2_2_6(t *testing.T) {
 	// 2.2.6.2 当 promise 被 rejected 时，所有 onRejected 按 then 注册顺序执行
 	//
 	t.Run("2.2.6.2", func(t *testing.T) {
+		t.Parallel()
 		t.Run("multiple boring rejection handlers", func(t *testing.T) {
+			t.Parallel()
 			testRejected(t, sentinel, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				// adjusted: sinon.stub().returns(other) → 记录 id 并返回 other 的处理器
@@ -234,6 +243,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("multiple rejection handlers, one of which throws", func(t *testing.T) {
+			t.Parallel()
 			testRejected(t, sentinel, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				handler := func(id string) func(error) (any, error) {
@@ -274,6 +284,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("results in multiple branching chains with their own fulfillment values", func(t *testing.T) {
+			t.Parallel()
 			testRejected(t, sentinel, func(t *testing.T, p *Promise) *Promise {
 				// adjusted: callbackAggregator(3, done) → 计数凑满 3 后 resolve 组合 promise
 				combiner, resolveCombiner, _ := deferred()
@@ -313,6 +324,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("'onRejected' handlers are called in the original order", func(t *testing.T) {
+			t.Parallel()
 			testRejected(t, dummy, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				// adjusted: sinon.spy(handlerN) → 记录 id 的处理器
@@ -339,6 +351,7 @@ func TestAplus2_2_6(t *testing.T) {
 		})
 
 		t.Run("even when one handler is added inside another handler", func(t *testing.T) {
+			t.Parallel()
 			testRejected(t, dummy, func(t *testing.T, p *Promise) *Promise {
 				var order []string
 				handler := func(id string) func(error) (any, error) {

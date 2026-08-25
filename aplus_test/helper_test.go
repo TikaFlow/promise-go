@@ -120,6 +120,7 @@ func expectFulfilled(t *testing.T, p *Promise, want any) *Promise {
 
 // expectRejected 断言 p 以理由 wantReason 拒绝，返回该断言链的尾部 promise。
 func expectRejected(t *testing.T, p *Promise, wantReason any) *Promise {
+	t.Helper()
 	return p.Then(func(v any) (any, error) {
 		t.Errorf("expected rejected, got fulfilled %#v", v)
 		return nil, nil

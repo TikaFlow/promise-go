@@ -9,6 +9,7 @@ import (
 
 // 2.1.3: 当已 rejected 后，promise 不得再迁移到任何其他状态。
 func TestAplus2_1_3(t *testing.T) {
+	t.Parallel()
 	testRejected(t, dummy, func(t *testing.T, p *Promise) *Promise {
 		return p.Then(func(v any) (any, error) {
 			t.Errorf("promise transitioned to fulfilled after being rejected: %#v", v)
@@ -19,6 +20,7 @@ func TestAplus2_1_3(t *testing.T) {
 	})
 
 	t.Run("trying to reject then immediately fulfill", func(t *testing.T) {
+		t.Parallel()
 		rejectThenFulfill(t, func(resolve, reject func(any)) {
 			reject(dummy)
 			resolve(dummy)
@@ -26,6 +28,7 @@ func TestAplus2_1_3(t *testing.T) {
 	})
 
 	t.Run("trying to reject then fulfill, delayed", func(t *testing.T) {
+		t.Parallel()
 		rejectThenFulfill(t, func(resolve, reject func(any)) {
 			el.SetTimeout(func() {
 				reject(dummy)
@@ -35,6 +38,7 @@ func TestAplus2_1_3(t *testing.T) {
 	})
 
 	t.Run("trying to reject immediately then fulfill delayed", func(t *testing.T) {
+		t.Parallel()
 		rejectThenFulfill(t, func(resolve, reject func(any)) {
 			reject(dummy)
 			el.SetTimeout(func() { resolve(dummy) }, 50)

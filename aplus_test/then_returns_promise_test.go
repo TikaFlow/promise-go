@@ -10,7 +10,9 @@ import (
 
 // 2.2.7: `then` 必须返回一个 promise：`promise2 = promise1.then(onFulfilled, onRejected)`
 func TestAplus2_2_7(t *testing.T) {
+	t.Parallel()
 	t.Run("is a promise", func(t *testing.T) {
+		t.Parallel()
 		// adjusted: `promise1.then()` 在 Go 中必须以 `Then(nil, nil)` 显式表达
 		p1, _, _ := deferred()
 		p2 := p1.Then(nil, nil)
@@ -21,10 +23,12 @@ func TestAplus2_2_7(t *testing.T) {
 	})
 
 	t.Run("2.2.7.1: If either `onFulfilled` or `onRejected` returns a value `x`, run the Promise Resolution Procedure `[[Resolve]](promise2, x)`", func(t *testing.T) {
+		t.Parallel()
 		// 占位用例：该子句由独立的 3.3 系列测试覆盖，此处不做断言。
 	})
 
 	t.Run("2.2.7.2: If either `onFulfilled` or `onRejected` throws an exception `e`, `promise2` must be rejected with `e` as the reason.", func(t *testing.T) {
+		t.Parallel()
 		reasons := []struct {
 			name string
 			make func() any
@@ -72,6 +76,7 @@ func TestAplus2_2_7(t *testing.T) {
 	})
 
 	t.Run("2.2.7.3: If `onFulfilled` is not a function and `promise1` is fulfilled, `promise2` must be fulfilled with the same value.", func(t *testing.T) {
+		t.Parallel()
 		// 官方在此遍历 undefined/null/false/5/object/array 六种非函数值。
 		// Go 的 nil 回调即可表达 undefined/null；其余 false/5/object/array 无对应物，跳过。
 		testFulfilled(t, sentinel, func(t *testing.T, p *Promise) *Promise {
@@ -86,10 +91,12 @@ func TestAplus2_2_7(t *testing.T) {
 	})
 
 	t.Run("2.2.7.3-N/A", func(t *testing.T) {
+		t.Parallel()
 		skipNA(t, "2.2.7.3-N/A", 15, "非函数处理器中除 nil/undefined/null 外，false/5/object/array 在 Go 无对应物")
 	})
 
 	t.Run("2.2.7.4: If `onRejected` is not a function and `promise1` is rejected, `promise2` must be rejected with the same reason.", func(t *testing.T) {
+		t.Parallel()
 		// 官方在此遍历 undefined/null/false/5/object/array 六种非函数值。
 		// Go 的 nil 回调即可表达 undefined/null；其余 false/5/object/array 无对应物，跳过。
 		testRejected(t, sentinel, func(t *testing.T, p *Promise) *Promise {
@@ -101,6 +108,7 @@ func TestAplus2_2_7(t *testing.T) {
 	})
 
 	t.Run("2.2.7.4-N/A", func(t *testing.T) {
+		t.Parallel()
 		skipNA(t, "2.2.7.4-N/A", 15, "非函数处理器中除 nil/undefined/null 外，false/5/object/array 在 Go 无对应物")
 	})
 }
