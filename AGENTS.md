@@ -32,7 +32,13 @@
 - `core.go`：包文档与术语约定、状态常量（`Pending`/`Fulfilled`/`Rejected`）、回调类型（`ThenCallback`/`CatchCallback`/`FinallyCallback`/`Executor`）、`StartEventLoop` 的初始化和 worker-pool 组装
 - `promise.go`：`Promise` 结构体与公开方法（`State`/`Done`/`Value`/`Reason`/`Then`/`Catch`/`Finally`/`String`）
 - `function.go`：状态机核心 —— `resolvePromise`/`rejectPromise`/`flushHandlers`。Promises/A+ 的 2.3.x 解析流程和回调入微队列都在这里，改动状态机语义先看这个文件
-- `eventloop.go`：`EventLoop` 及绝大多数公开 API —— 批量（`All`/`AllSettled`/`Race`/`Any`/`Some`）、迭代（`Map`/`Filter`/`Each`/`Reduce`）、定时器（`SetTimeout`/`SetInterval`/`ClearTimeout`/`ClearInterval`/`Delay`）、工具（`Async`/`Await`/`Try`/`Resolve`/`Reject`/`NewPromise`/`PromiseWithResolvers`/`QueueMicrotask`/`Timeout`）、钩子注册（`On`/`Off`）、`Stop`
+- `eventloop.go`：`EventLoop` 结构体与事件循环核心（`run`/`drainMicro`/`flushTasks`/`pushTask`）、`Stop`、钩子注册（`On`/`Off`）
+- `batch.go`：批量组合子 `All`/`AllSettled`/`Race`/`Any`/`Some`
+- `iterate.go`：迭代 `Map`/`Filter`/`Each`/`Reduce`
+- `timers.go`：定时器 API `SetTimeout`/`SetInterval`/`ClearTimeout`/`ClearInterval`/`Delay`/`Timeout`
+- `utility.go`：工具 API `Async`/`Await`/`Try`/`Resolve`/`Reject`/`NewPromise`/`PromiseWithResolvers`/`QueueMicrotask`
+- `queue.go`：无限容量 FIFO 队列 `Queue`（微/宏任务队列底层，含 feed 搬运与内存控制）
+- `common.go`：通用工具函数 `randString`/`deleteFromSlice`
 - `timeline.go`：`timeLine` 定时器调度器，用按时排序的切片 + `time.Timer` + 通道，将到期任务推送到宏任务队列
 - `hook.go`：`HookType` 常量与钩子注册表 `promiseHooks`
 - `promise_error.go`：错误类型（`TypeError`/`RangeError`/`TimeoutError`/`AggregateError`/`UnexpectedError`）
