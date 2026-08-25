@@ -161,6 +161,7 @@ _ = el.OffPromise(PromiseCreated, key)
 - **AllPanic**：所有 panic 的通用钩子，优先触发
 - **PromisePanic**：Promise 回调发生 panic 时
 - **AsyncPanic**：Async 任务发生 panic 时
+- **ExecutorPanic**：Promise 执行器（executor）发生 panic 时
 - **TimerPanic**：定时器任务发生 panic 时
 - **HookPanic**：钩子函数自身发生 panic 时
 

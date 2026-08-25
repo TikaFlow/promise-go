@@ -40,7 +40,7 @@
 - `queue.go`：无限容量 FIFO 队列 `Queue`（微/宏任务队列底层，含 feed 搬运与内存控制）
 - `common.go`：通用工具函数 `randString`/`deleteFromSlice`
 - `timeline.go`：`timeLine` 定时器调度器，用按时排序的切片 + `time.Timer` + 通道，将到期任务推送到宏任务队列
-- `hook.go`：`HookType` 常量、两套钩子注册表 `hooks`（Promise 事件钩子 + Panic 事件钩子）、`safeCall`/`collectHooks`/`callPromiseHooks`/`callPanicHooks`
+- `hook.go`：`HookType` 常量、两套钩子注册表 `hooks`（Promise 事件钩子 + Panic 事件钩子含 AllPanic/PromisePanic/AsyncPanic/ExecutorPanic/HookPanic/TimerPanic）、`safeCall`/`collectHooks`/`callPromiseHooks`/`callPanicHooks`
 - `promise_error.go`：错误类型（`TypeError`/`RangeError`/`TimeoutError`/`AggregateError`/`UnexpectedError`）
 
 ### 状态机要点
