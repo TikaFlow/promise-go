@@ -215,7 +215,7 @@ func (el *EventLoop) Stop() {
 }
 
 // OffPanic 解绑一个 panic 钩子函数
-//   - event 钩子事件类型，可选值为 [ [AllPanic] | [PromisePanic] | [AsyncPanic] | [HookPanic] | [TimerPanic] ]
+//   - event 钩子事件类型，可选值为 [ [AllPanic] | [PromisePanic] | [AsyncPanic] | [ExecutorPanic] | [HookPanic] | [TimerPanic] ]
 //   - key 要解绑的钩子函数的唯一标识，由 [EventLoop.OnPanic] 方法返回
 //
 // event 与 key 必须匹配，否则将解绑失败
@@ -239,6 +239,8 @@ func (el *EventLoop) OffPanic(event HookType, key string) bool {
 		targetSlice = &el.hooks.promisePanicHookKeys
 	case AsyncPanic:
 		targetSlice = &el.hooks.asyncPanicHookKeys
+	case ExecutorPanic:
+		targetSlice = &el.hooks.executorPanicHookKeys
 	case HookPanic:
 		targetSlice = &el.hooks.hookPanicHookKeys
 	case TimerPanic:
@@ -257,7 +259,7 @@ func (el *EventLoop) OffPanic(event HookType, key string) bool {
 }
 
 // OnPanic 绑定一个 panic 钩子函数
-//   - event 钩子事件类型，可选值为 [ [AllPanic] | [PromisePanic] | [AsyncPanic] | [HookPanic] | [TimerPanic] ]
+//   - event 钩子事件类型，可选值为 [ [AllPanic] | [PromisePanic] | [AsyncPanic] | [ExecutorPanic] | [HookPanic] | [TimerPanic] ]
 //   - hook 钩子函数，当对应 panic 发生时调用，接收 panic 值
 //
 // # return
@@ -287,6 +289,9 @@ func (el *EventLoop) OnPanic(event HookType, hook func(r any)) string {
 		el.hooks.panicHooks[key] = hook
 	case AsyncPanic:
 		el.hooks.asyncPanicHookKeys = append(el.hooks.asyncPanicHookKeys, key)
+		el.hooks.panicHooks[key] = hook
+	case ExecutorPanic:
+		el.hooks.executorPanicHookKeys = append(el.hooks.executorPanicHookKeys, key)
 		el.hooks.panicHooks[key] = hook
 	case HookPanic:
 		el.hooks.hookPanicHookKeys = append(el.hooks.hookPanicHookKeys, key)

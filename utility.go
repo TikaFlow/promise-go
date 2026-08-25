@@ -87,7 +87,7 @@ func (el *EventLoop) Await(prom any, timeout int64) (v any, err error) {
 //   - exec 执行器函数，用于定义 [Promise] 的异步操作
 func (el *EventLoop) NewPromise(exec Executor) *Promise {
 	if exec == nil {
-		panic("Promise executor must be a function")
+		panic(NewTypeError("Promise executor must be a function"))
 	}
 
 	prom := &Promise{
@@ -111,18 +111,16 @@ func (el *EventLoop) NewPromise(exec Executor) *Promise {
 		})
 	}
 
-	// 执行器内部发生 panic 时，同样按照规范将其作为拒绝理由处理。
-	// 注：若执行器先 resolve 再 panic，sync.Once 保证该 panic 被忽略（规范 2.3.3 已决后忽略）。
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				rej(r)
-			}
-		}()
+	// 执行器内部发生 panic 时，同样按照规范将其作为拒绝理由处理，
+	// 并触发 ExecutorPanic 钩子。注：若执行器先 resolve 再 panic，
+	// sync.Once 保证该 panic 被忽略（规范 2.3.3 已决后忽略）。
+	if r := el.hooks.safeCall(ExecutorPanic, func() {
 		if err := exec(res, rej); err != nil {
 			rej(err)
 		}
-	}()
+	}); r != nil {
+		rej(r)
+	}
 	return prom
 }
 

@@ -27,6 +27,8 @@ const (
 	PromisePanic HookType = "PROMISE_PANIC"
 	// AsyncPanic 当 Async 任务发生 panic 时调用。
 	AsyncPanic HookType = "ASYNC_PANIC"
+	// ExecutorPanic 当 Promise 执行器（executor）发生 panic 时调用。
+	ExecutorPanic HookType = "EXECUTOR_PANIC"
 	// HookPanic 当钩子函数自身发生 panic 时调用。
 	HookPanic HookType = "HOOK_PANIC"
 	// TimerPanic 当定时器任务发生 panic 时调用。
@@ -47,13 +49,14 @@ type hooks struct {
 	promiseHooks             map[string]func(p *Promise)
 	promiseHooksLock         sync.RWMutex
 
-	allPanicHookKeys     []string
-	promisePanicHookKeys []string
-	asyncPanicHookKeys   []string
-	hookPanicHookKeys    []string
-	timerPanicHookKeys   []string
-	panicHooks           map[string]func(r any)
-	panicHooksLock       sync.RWMutex
+	allPanicHookKeys      []string
+	promisePanicHookKeys  []string
+	asyncPanicHookKeys    []string
+	executorPanicHookKeys []string
+	hookPanicHookKeys     []string
+	timerPanicHookKeys    []string
+	panicHooks            map[string]func(r any)
+	panicHooksLock        sync.RWMutex
 }
 
 // safeCall 以指定事件包裹 fn 的调用：fn 发生 panic 时捕获，先触发 AllPanic
@@ -121,6 +124,8 @@ func (hk *hooks) callPanicHooks(event HookType, r any) {
 		keys = hk.promisePanicHookKeys
 	case AsyncPanic:
 		keys = hk.asyncPanicHookKeys
+	case ExecutorPanic:
+		keys = hk.executorPanicHookKeys
 	case HookPanic:
 		keys = hk.hookPanicHookKeys
 	case TimerPanic:
