@@ -242,3 +242,27 @@ func TestHookPanicCascade(t *testing.T) {
 		t.Errorf("AllPanic 钩子应被触发多次，实际 %d", allCalls)
 	}
 }
+
+// 测试 Stop 清场时，残留定时器回调 panic 不冒泡且触发 TimerPanic。
+// 使用长定时器确保回调在 Stop 时仍残留于 timeline.tasks，由 flushTasks 执行。
+func TestStopFlushTasksTimerPanic(t *testing.T) {
+	t.Parallel()
+	el2 := StartEventLoop(1)
+
+	var timerPanicCalled bool
+	el2.OnPanic(TimerPanic, func(r any) {
+		timerPanicCalled = true
+	})
+
+	// 长定时器：Stop 时回调仍残留于调度队列，flushTasks 清场时执行并触发 TimerPanic。
+	// 需短暂等待，确保 scheduler 已从 taskCh 取出并放入调度队列，避免时序竞争。
+	el2.SetTimeout(func() {
+		panic("timer boom")
+	}, 5000)
+	time.Sleep(50 * time.Millisecond)
+
+	el2.Stop() // 不应 panic 冒泡
+	if !timerPanicCalled {
+		t.Errorf("残留定时器回调 panic 应触发 TimerPanic 钩子")
+	}
+}

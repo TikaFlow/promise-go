@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	. "github.com/TikaFlow/promise-go"
 )
 
 // 测试Promise执行器错误处理
@@ -58,12 +60,70 @@ func TestExecutorErrorAfterResolved(t *testing.T) {
 func TestExecutorNil(t *testing.T) {
 	t.Parallel()
 	defer func() {
-		if r := recover(); r == nil {
+		r := recover()
+		if r == nil {
 			t.Errorf("Expected panic for nil executor")
+		}
+		if _, ok := r.(*TypeError); !ok {
+			t.Errorf("Expected *TypeError panic, got %T: %v", r, r)
 		}
 	}()
 
 	el.NewPromise(nil)
+}
+
+// 测试 executor panic 触发 ExecutorPanic 钩子，且 Promise 被拒绝。
+func TestExecutorPanicHook(t *testing.T) {
+	t.Parallel()
+
+	el2 := StartEventLoop(1)
+	defer el2.Stop()
+
+	var executorCalls int
+	el2.OnPanic(ExecutorPanic, func(r any) {
+		executorCalls++
+	})
+
+	sentinel := errors.New("exec boom")
+	p := el2.NewPromise(func(resolve, reject func(v any)) error {
+		panic(sentinel)
+	})
+	mustSettle(t, p, 2*time.Second)
+
+	if p.State() != Rejected {
+		t.Fatalf("expect Rejected, got %s", p.State())
+	}
+	if !errors.Is(p.Reason(), sentinel) {
+		t.Fatalf("unexpected reason: %v", p.Reason())
+	}
+	if executorCalls == 0 {
+		t.Errorf("ExecutorPanic 钩子未被触发")
+	}
+}
+
+// 测试 Try 的 fn panic 触发 ExecutorPanic 钩子，且 Promise 被拒绝。
+func TestTryFnPanicHook(t *testing.T) {
+	t.Parallel()
+
+	el2 := StartEventLoop(1)
+	defer el2.Stop()
+
+	var executorCalls int
+	el2.OnPanic(ExecutorPanic, func(r any) {
+		executorCalls++
+	})
+
+	p := el2.Try(func(...any) (any, error) {
+		panic("try boom")
+	})
+	mustSettle(t, p, 2*time.Second)
+
+	if p.State() != Rejected {
+		t.Fatalf("expect Rejected, got %s", p.State())
+	}
+	if executorCalls == 0 {
+		t.Errorf("Try 的 fn panic 应触发 ExecutorPanic 钩子")
+	}
 }
 
 // 测试Thenable对象处理

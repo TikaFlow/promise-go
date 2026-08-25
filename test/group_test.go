@@ -722,3 +722,51 @@ func TestSomeNumLE0(t *testing.T) {
 		return nil, nil
 	})
 }
+
+// 测试 Each 迭代器 panic：应拒绝返回的 Promise（panic 视为拒绝理由）。
+func TestEachIteratorPanic(t *testing.T) {
+	t.Parallel()
+	p := el.Each(func(item any, index int, arrLen int) any {
+		panic("each boom")
+	}, el.Resolve(1), el.Resolve(2))
+	mustSettle(t, p, 2*time.Second)
+	if p.State() != Rejected {
+		t.Fatalf("expect Rejected, got %s", p.State())
+	}
+}
+
+// 测试 Map 的 mapper panic：应拒绝返回的 Promise。
+func TestMapMapperPanic(t *testing.T) {
+	t.Parallel()
+	p := el.Map(func(item any) any {
+		panic("map boom")
+	}, el.Resolve(1), el.Resolve(2))
+	mustSettle(t, p, 2*time.Second)
+	if p.State() != Rejected {
+		t.Fatalf("expect Rejected, got %s", p.State())
+	}
+}
+
+// 测试 Filter 的 filter panic：应拒绝返回的 Promise。
+func TestFilterFilterPanic(t *testing.T) {
+	t.Parallel()
+	p := el.Filter(func(item any) bool {
+		panic("filter boom")
+	}, el.Resolve(1), el.Resolve(2))
+	mustSettle(t, p, 2*time.Second)
+	if p.State() != Rejected {
+		t.Fatalf("expect Rejected, got %s", p.State())
+	}
+}
+
+// 测试 Reduce 的 reducer panic：应拒绝返回的 Promise。
+func TestReduceReducerPanic(t *testing.T) {
+	t.Parallel()
+	p := el.Reduce(func(acc any, cur any) any {
+		panic("reduce boom")
+	}, 0, el.Resolve(1), el.Resolve(2))
+	mustSettle(t, p, 2*time.Second)
+	if p.State() != Rejected {
+		t.Fatalf("expect Rejected, got %s", p.State())
+	}
+}

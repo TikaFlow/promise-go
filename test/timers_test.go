@@ -211,3 +211,44 @@ func TestSetTimeoutZeroMillis(t *testing.T) {
 		t.Errorf("Expected str 'timeout value', got %s", str)
 	}
 }
+
+// 测试 Stop 后调用定时器 API 不再 panic（send-on-close 已消除）。
+func TestTimerAPIAfterStop(t *testing.T) {
+	t.Parallel()
+	el2 := StartEventLoop(1)
+	id := el2.SetTimeout(func() {}, 10)
+	el2.Stop()
+
+	if got := el2.SetTimeout(func() {}, 10); got != -1 {
+		t.Errorf("Stop 后 SetTimeout 应返回 -1，实际 %d", got)
+	}
+	if got := el2.SetInterval(func() {}, 10); got != -1 {
+		t.Errorf("Stop 后 SetInterval 应返回 -1，实际 %d", got)
+	}
+	el2.ClearTimeout(id) // 有效 id，应在队列关闭后安全丢弃
+	el2.ClearInterval(id)
+	el2.ClearTimeout(-1) // 无效 id，直接返回
+}
+
+// 测试宏任务（定时器回调）panic 不中断事件循环：后续定时器仍能执行。
+func TestTimerPanicLoopContinues(t *testing.T) {
+	t.Parallel()
+	el2 := StartEventLoop(1)
+	defer el2.Stop()
+
+	// 第一个定时器回调 panic，第二个应仍正常触发。
+	el2.SetTimeout(func() {
+		panic("boom")
+	}, 10)
+
+	done := make(chan struct{})
+	el2.SetTimeout(func() {
+		close(done)
+	}, 100)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("宏任务 panic 带崩了事件循环，后续定时器未执行")
+	}
+}
