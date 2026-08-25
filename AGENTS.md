@@ -32,7 +32,7 @@
 - `core.go`：包文档与术语约定、状态常量（`Pending`/`Fulfilled`/`Rejected`）、回调类型（`ThenCallback`/`CatchCallback`/`FinallyCallback`/`Executor`）、`StartEventLoop` 的初始化和 worker-pool 组装
 - `promise.go`：`Promise` 结构体与公开方法（`State`/`Done`/`Value`/`Reason`/`Then`/`Catch`/`Finally`/`String`）
 - `function.go`：状态机核心 —— `resolvePromise`/`rejectPromise`/`flushHandlers`。Promises/A+ 的 2.3.x 解析流程和回调入微队列都在这里，改动状态机语义先看这个文件
-- `eventloop.go`：`EventLoop` 结构体与事件循环核心（`run`/`drainMicro`/`flushTasks`/`pushTask`）、`Stop`、钩子注册（`On`/`Off`）
+- `eventloop.go`：`EventLoop` 结构体与事件循环核心（`run`/`drainMicro`/`flushTasks`/`pushTask`）、`Stop`、钩子注册（`OnPromise`/`OffPromise`/`OnPanic`/`OffPanic`）
 - `batch.go`：批量组合子 `All`/`AllSettled`/`Race`/`Any`/`Some`
 - `iterate.go`：迭代 `Map`/`Filter`/`Each`/`Reduce`
 - `timers.go`：定时器 API `SetTimeout`/`SetInterval`/`ClearTimeout`/`ClearInterval`/`Delay`/`Timeout`
@@ -40,7 +40,7 @@
 - `queue.go`：无限容量 FIFO 队列 `Queue`（微/宏任务队列底层，含 feed 搬运与内存控制）
 - `common.go`：通用工具函数 `randString`/`deleteFromSlice`
 - `timeline.go`：`timeLine` 定时器调度器，用按时排序的切片 + `time.Timer` + 通道，将到期任务推送到宏任务队列
-- `hook.go`：`HookType` 常量与钩子注册表 `promiseHooks`
+- `hook.go`：`HookType` 常量、两套钩子注册表 `hooks`（Promise 事件钩子 + Panic 事件钩子）、`safeCall`/`collectHooks`/`callPromiseHooks`/`callPanicHooks`
 - `promise_error.go`：错误类型（`TypeError`/`RangeError`/`TimeoutError`/`AggregateError`/`UnexpectedError`）
 
 ### 状态机要点
@@ -53,6 +53,6 @@
 ## 测试组织
 
 - `aplus_test/`：Promises/A+ 官方合规套件移植（`promises-aplus-tests`，约 209 个叶子用例 + 9 组 N/A skip），用于自检 A+ 合规性；`main_test.go` 的 `TestMain` 创建共享 `el = StartEventLoop(1)` 并在退出时 `Stop()`。详见解包内 `REPORT.md`
-- `test/`：库自身功能测试——宏任务队列（`SetTimeout`/`SetInterval`）、ES/Promise 扩展（`All`/`AllSettled`/`Race`/`Any`/`Some`/`Map`/`Filter`/`Each`/`Reduce`）、工具 API（`Await`/`Delay`/`Try`/`Async`/`PromiseWithResolvers`/`Timeout`）、钩子（`On`/`Off`）、状态访问器（`State`/`Value`/`Reason`/`Done`）、事件循环时序（宏/微任务顺序）等非 A+ 部分。两个目录均使用外部测试包名（`promise_test`），点导入 `. "github.com/TikaFlow/promise-go"` 引用主包
+- `test/`：库自身功能测试——宏任务队列（`SetTimeout`/`SetInterval`）、ES/Promise 扩展（`All`/`AllSettled`/`Race`/`Any`/`Some`/`Map`/`Filter`/`Each`/`Reduce`）、工具 API（`Await`/`Delay`/`Try`/`Async`/`PromiseWithResolvers`/`Timeout`）、钩子（`OnPromise`/`OnPanic` 及 panic 级联/止啸叫）、状态访问器（`State`/`Value`/`Reason`/`Done`）、事件循环时序（宏/微任务顺序）等非 A+ 部分。两个目录均使用外部测试包名（`promise_test`），点导入 `. "github.com/TikaFlow/promise-go"` 引用主包
 - 根目录 `example_test.go` 是可运行的示例（`Output:` 注释即断言）
 - 涉及事件循环/时序的测试常依赖 `time.Sleep`，执行结果与 goroutine 繁忙程度相关；单独运行某个测试时需留意事件循环 worker 数量与延时

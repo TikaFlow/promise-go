@@ -15,13 +15,15 @@ func (el *EventLoop) Async(fn func() (any, error)) *Promise {
 
 	return el.NewPromise(func(resolve, reject func(any)) error {
 		task := func() {
-			// fn 内 panic 同样视为拒绝理由
-			defer func() {
-				if r := recover(); r != nil {
-					reject(r)
-				}
-			}()
-			v, err := fn()
+			// fn 内 panic 视为拒绝理由，且触发 AsyncPanic 钩子
+			var v any
+			var err error
+			if r := el.hooks.safeCall(AsyncPanic, func() {
+				v, err = fn()
+			}); r != nil {
+				reject(r)
+				return
+			}
 			if err != nil {
 				reject(err)
 				return

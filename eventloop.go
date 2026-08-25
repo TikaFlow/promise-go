@@ -50,7 +50,7 @@ func (el *EventLoop) drainMicro() bool {
 			if !ok {
 				return false
 			}
-			task()
+			el.hooks.safeCall(PromisePanic, task)
 			continue
 		default:
 		}
@@ -65,7 +65,7 @@ func (el *EventLoop) drainMicro() bool {
 			if !ok {
 				return false
 			}
-			task()
+			el.hooks.safeCall(PromisePanic, task)
 		case <-el.done:
 			return false
 		}
@@ -84,7 +84,7 @@ func (el *EventLoop) run() {
 			if !ok {
 				return
 			}
-			task()
+			el.hooks.safeCall(TimerPanic, task)
 			continue
 		case <-el.done:
 			return
@@ -96,12 +96,12 @@ func (el *EventLoop) run() {
 			if !ok {
 				return
 			}
-			task()
+			el.hooks.safeCall(PromisePanic, task)
 		case task, ok := <-el.macrotaskQueue.Pop():
 			if !ok {
 				return
 			}
-			task()
+			el.hooks.safeCall(TimerPanic, task)
 		case <-el.done:
 			return
 		}
@@ -215,7 +215,7 @@ func (el *EventLoop) Stop() {
 }
 
 // OffPanic 解绑一个 panic 钩子函数
-//   - event 钩子事件类型，可选值为 [ [TimerPanic] ]
+//   - event 钩子事件类型，可选值为 [ [AllPanic] | [PromisePanic] | [AsyncPanic] | [HookPanic] | [TimerPanic] ]
 //   - key 要解绑的钩子函数的唯一标识，由 [EventLoop.OnPanic] 方法返回
 //
 // event 与 key 必须匹配，否则将解绑失败
@@ -233,6 +233,14 @@ func (el *EventLoop) OffPanic(event HookType, key string) bool {
 
 	var targetSlice *[]string
 	switch event {
+	case AllPanic:
+		targetSlice = &el.hooks.allPanicHookKeys
+	case PromisePanic:
+		targetSlice = &el.hooks.promisePanicHookKeys
+	case AsyncPanic:
+		targetSlice = &el.hooks.asyncPanicHookKeys
+	case HookPanic:
+		targetSlice = &el.hooks.hookPanicHookKeys
 	case TimerPanic:
 		targetSlice = &el.hooks.timerPanicHookKeys
 	}
@@ -249,7 +257,7 @@ func (el *EventLoop) OffPanic(event HookType, key string) bool {
 }
 
 // OnPanic 绑定一个 panic 钩子函数
-//   - event 钩子事件类型，可选值为 [ [TimerPanic] ]
+//   - event 钩子事件类型，可选值为 [ [AllPanic] | [PromisePanic] | [AsyncPanic] | [HookPanic] | [TimerPanic] ]
 //   - hook 钩子函数，当对应 panic 发生时调用，接收 panic 值
 //
 // # return
@@ -271,6 +279,18 @@ func (el *EventLoop) OnPanic(event HookType, hook func(r any)) string {
 	}
 
 	switch event {
+	case AllPanic:
+		el.hooks.allPanicHookKeys = append(el.hooks.allPanicHookKeys, key)
+		el.hooks.panicHooks[key] = hook
+	case PromisePanic:
+		el.hooks.promisePanicHookKeys = append(el.hooks.promisePanicHookKeys, key)
+		el.hooks.panicHooks[key] = hook
+	case AsyncPanic:
+		el.hooks.asyncPanicHookKeys = append(el.hooks.asyncPanicHookKeys, key)
+		el.hooks.panicHooks[key] = hook
+	case HookPanic:
+		el.hooks.hookPanicHookKeys = append(el.hooks.hookPanicHookKeys, key)
+		el.hooks.panicHooks[key] = hook
 	case TimerPanic:
 		el.hooks.timerPanicHookKeys = append(el.hooks.timerPanicHookKeys, key)
 		el.hooks.panicHooks[key] = hook

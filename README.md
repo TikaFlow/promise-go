@@ -132,22 +132,46 @@ func main() {
 
 ## 钩子函数
 
-`EventLoop` 支持在 `Promise` 生命周期的关键节点插入回调：
+`EventLoop` 提供两套钩子系统：
 
-- **OnCreated**：`Promise` 实例被创建时
-- **OnChained**：`Promise` 实例被链式调用（`Then`、`Catch`、`Finally`）时
-- **OnFulfilled**：`Promise` 实例解决时
-- **OnRejected**：`Promise` 实例拒绝时
-- **OnSettled**：`Promise` 实例已决时（无论解决或拒绝）
+### Promise 事件钩子
+
+在 `Promise` 生命周期的关键节点插入回调，回调签名为 `func(p *Promise)`：
+
+- **PromiseCreated**：`Promise` 实例被创建时
+- **PromiseChained**：`Promise` 实例被链式调用（`Then`、`Catch`、`Finally`）时
+- **PromiseFulfilled**：`Promise` 实例解决时
+- **PromiseRejected**：`Promise` 实例拒绝时
+- **PromiseSettled**：`Promise` 实例已决时（无论解决或拒绝）
 
 ```go
 // 注册钩子
-key := el.On(promise.OnCreated, func(p *promise.Promise) {
+key := el.OnPromise(promise.PromiseCreated, func(p *promise.Promise) {
     fmt.Println("New promise created")
 })
 
 // 注销钩子
-_ = el.Off(promise.OnCreated, key)
+_ = el.OffPromise(PromiseCreated, key)
+```
+
+### Panic 事件钩子
+
+当任务执行中发生 panic 时触发，回调签名为 `func(r any)`。所有 panic 先触发 `AllPanic`，再触发具体事件：
+
+- **AllPanic**：所有 panic 的通用钩子，优先触发
+- **PromisePanic**：Promise 回调发生 panic 时
+- **AsyncPanic**：Async 任务发生 panic 时
+- **TimerPanic**：定时器任务发生 panic 时
+- **HookPanic**：钩子函数自身发生 panic 时
+
+```go
+// 注册 panic 钩子
+key := el.OnPanic(promise.TimerPanic, func(r any) {
+    fmt.Printf("timer panic: %v\n", r)
+})
+
+// 注销 panic 钩子
+_ = el.OffPanic(promise.TimerPanic, key)
 ```
 
 ## 注意事项

@@ -21,9 +21,21 @@ const (
 
 // 以下常量用于 Panic 事件钩子，回调签名为 func(r any)。
 const (
+	// AllPanic 所有 panic 事件的通用钩子，任何 panic 都会先触发它。
+	AllPanic HookType = "ALL_PANIC"
+	// PromisePanic 当 Promise 回调发生 panic 时调用。
+	PromisePanic HookType = "PROMISE_PANIC"
+	// AsyncPanic 当 Async 任务发生 panic 时调用。
+	AsyncPanic HookType = "ASYNC_PANIC"
+	// HookPanic 当钩子函数自身发生 panic 时调用。
+	HookPanic HookType = "HOOK_PANIC"
 	// TimerPanic 当定时器任务发生 panic 时调用。
 	TimerPanic HookType = "TIMER_PANIC"
 )
+
+// ignorePanic 内部专用事件：safeCall 捕获 panic 后静默吞掉，不再触发任何钩子。
+// 用于钩子自身执行的包裹，避免钩子 panic 递归触发 HookPanic 造成啸叫。
+const ignorePanic HookType = "IGNORE_PANIC"
 
 // 钩子实例定义
 type hooks struct {
@@ -35,15 +47,46 @@ type hooks struct {
 	promiseHooks             map[string]func(p *Promise)
 	promiseHooksLock         sync.RWMutex
 
-	timerPanicHookKeys []string
-	panicHooks         map[string]func(r any)
-	panicHooksLock     sync.RWMutex
+	allPanicHookKeys     []string
+	promisePanicHookKeys []string
+	asyncPanicHookKeys   []string
+	hookPanicHookKeys    []string
+	timerPanicHookKeys   []string
+	panicHooks           map[string]func(r any)
+	panicHooksLock       sync.RWMutex
+}
+
+// safeCall 以指定事件包裹 fn 的调用：fn 发生 panic 时捕获，先触发 AllPanic
+// 再触发 event 对应的钩子，并返回 panic 值（无 panic 返回 nil）。
+// event 为 ignorePanic 时静默吞掉 panic，不触发任何钩子。
+func (hk *hooks) safeCall(event HookType, fn func()) (r any) {
+	defer func() {
+		if r = recover(); r != nil && event != ignorePanic {
+			hk.callPanicHooks(AllPanic, r)
+			hk.callPanicHooks(event, r)
+		}
+	}()
+	fn()
+	return
+}
+
+// collectHooks 泛型辅助：在锁内收集 key 对应的钩子函数快照，解锁后返回。
+func collectHooks[T any](lock *sync.RWMutex, hooks map[string]func(T), keys []string) []func(T) {
+	lock.RLock()
+	fns := make([]func(T), 0, len(keys))
+	for _, key := range keys {
+		if fn, ok := hooks[key]; ok {
+			fns = append(fns, fn)
+		}
+	}
+	lock.RUnlock()
+	return fns
 }
 
 // callPromiseHooks 通过钩子类型调用 Promise 事件钩子。
 //
-// 钩子函数在锁外执行。因此钩子内可安全调用 [EventLoop.OnPromise] / [EventLoop.OffPromise]
-// （二者需要写锁），不会因"持有读锁时尝试升级为写锁"而自死锁。
+// 钩子函数在锁外执行，且以 safeCall(HookPanic) 包裹：钩子自身 panic 时
+// 触发 HookPanic 事件，不影响调用方。
 func (hk *hooks) callPromiseHooks(event HookType, p *Promise) {
 	var keys []string
 	switch event {
@@ -58,38 +101,37 @@ func (hk *hooks) callPromiseHooks(event HookType, p *Promise) {
 	case PromiseSettled:
 		keys = hk.promiseSettledHookKeys
 	}
-	callHooks(&hk.promiseHooksLock, hk.promiseHooks, keys, p)
+
+	for _, fn := range collectHooks(&hk.promiseHooksLock, hk.promiseHooks, keys) {
+		hk.safeCall(HookPanic, func() { fn(p) })
+	}
 }
 
 // callPanicHooks 通过钩子类型调用 Panic 事件钩子，接收 panic 值。
 //
-// 钩子函数在锁外执行，且每个钩子以独立的 recover 包裹，防止钩子自身 panic
-// 二次引发事件循环崩溃。
+// 钩子函数在锁外执行。普通 panic 钩子以 safeCall(HookPanic) 包裹（钩子 panic
+// 时触发 HookPanic）；而 HookPanic 钩子以 safeCall(ignorePanic) 包裹，
+// 钩子 panic 时静默吞掉，避免递归触发造成啸叫。
 func (hk *hooks) callPanicHooks(event HookType, r any) {
 	var keys []string
 	switch event {
+	case AllPanic:
+		keys = hk.allPanicHookKeys
+	case PromisePanic:
+		keys = hk.promisePanicHookKeys
+	case AsyncPanic:
+		keys = hk.asyncPanicHookKeys
+	case HookPanic:
+		keys = hk.hookPanicHookKeys
 	case TimerPanic:
 		keys = hk.timerPanicHookKeys
 	}
 
-	callHooks(&hk.panicHooksLock, hk.panicHooks, keys, r)
-}
-
-// callHooks 泛型辅助：在锁内收集函数快照，解锁后逐个执行。
-//
-// 适用于任何钩子族系（promise 钩子、panic 钩子等），
-// 调用方只需提供对应的锁、映射表、key 切片和参数即可。
-func callHooks[T any](lock *sync.RWMutex, hooks map[string]func(T), keys []string, arg T) {
-	lock.RLock()
-	fns := make([]func(T), 0, len(keys))
-	for _, key := range keys {
-		if fn, ok := hooks[key]; ok {
-			fns = append(fns, fn)
-		}
+	wrap := HookPanic
+	if event == HookPanic {
+		wrap = ignorePanic
 	}
-	lock.RUnlock()
-
-	for _, fn := range fns {
-		fn(arg)
+	for _, fn := range collectHooks(&hk.panicHooksLock, hk.panicHooks, keys) {
+		hk.safeCall(wrap, func() { fn(r) })
 	}
 }

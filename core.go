@@ -102,6 +102,10 @@ func StartEventLoop(workerCount int) *EventLoop {
 		promiseRejectedHookKeys:  make([]string, 0, 64),
 		promiseSettledHookKeys:   make([]string, 0, 64),
 		promiseHooks:             make(map[string]func(p *Promise)),
+		allPanicHookKeys:         make([]string, 0, 64),
+		promisePanicHookKeys:     make([]string, 0, 64),
+		asyncPanicHookKeys:       make([]string, 0, 64),
+		hookPanicHookKeys:        make([]string, 0, 64),
 		timerPanicHookKeys:       make([]string, 0, 64),
 		panicHooks:               make(map[string]func(r any)),
 	}

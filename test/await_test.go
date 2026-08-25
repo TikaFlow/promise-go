@@ -28,7 +28,7 @@ func TestAwaitClearsTimeoutWhenBaseSettlesFirst(t *testing.T) {
 		t.Fatalf("expected ('ok', nil), got (v=%v, err=%v)", v, err)
 	}
 
-	// 等待超过超时点：若定时器未被清理，wait promise 会被拒绝并触发 OnRejected。
+	// 等待超过超时点：若定时器未被清理，wait promise 会被拒绝并触发 PromiseRejected。
 	time.Sleep(time.Second)
 	if rejected.Load() {
 		t.Fatal("timeout timer was not cleared: wait promise got rejected after base settled")
