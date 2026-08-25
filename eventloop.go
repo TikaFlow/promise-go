@@ -28,13 +28,13 @@ type EventLoop struct {
 // 遍历 el.timeline.tasks 是无锁读，因为此时所有调度都停止，可安全访问
 func (el *EventLoop) flushTasks() {
 	for task := range el.microtaskQueue.Pop() {
-		task()
+		el.hooks.safeCall(PromisePanic, task)
 	}
 	for task := range el.macrotaskQueue.Pop() {
-		task()
+		el.hooks.safeCall(TimerPanic, task)
 	}
 	for _, task := range el.timeline.tasks {
-		task.callback()
+		el.hooks.safeCall(TimerPanic, task.callback)
 	}
 }
 
