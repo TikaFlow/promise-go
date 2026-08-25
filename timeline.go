@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// invalidTimerID 无效定时器 ID：调度失败或事件循环已停止（队列关闭）时返回/传入。
+// invalidTimerID 无效定时器 ID
 const invalidTimerID = -1
 
 // 时间线类型，用于调度宏任务
