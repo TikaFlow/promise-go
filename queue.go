@@ -12,6 +12,8 @@ const (
 	queueMaxBufSize = 0x100000
 	// queueMaxReserve 保留节点数的上限
 	queueMaxReserve = 0x400000
+	// queueFeedBatch feed 每批搬出的元素数上限，等于 pop 通道的最小缓冲容量
+	queueFeedBatch = 0x10
 )
 
 // queueNode 链表的节点：一个元素值 + 指向下一节点的指针
@@ -153,41 +155,44 @@ func (q *Queue[T]) SetReserve(n int) bool {
 // 空队列时阻塞在 notify 上；收到信号后重新检查。队列关闭且排空后，
 // 关闭 pop 通道并退出。
 //
+// 批量搬运：一次持锁从链表取出至多 queueFeedBatch 个元素，释放锁后再逐个
+// 写入 pop 通道，把每元素的锁/原子开销摊薄到一批一次；批量期间 sending
+// 保持 true，供 empty() 识别在途元素。
+//
 // 向 pop 通道发送时不能持有 q.mu，否则通道写满时会阻塞整个队列。
 func (q *Queue[T]) feed() {
-	// nextValue 取出队首元素并推进 head，队列为空时返回 (zero, false)。
-	nextValue := func() (T, bool) {
-		if q.head == q.tail {
-			var zero T
-			return zero, false
-		}
-		v := q.head.value
-		// 清空引用，避免复用节点滞留旧值
-		q.head.value = *new(T)
-
-		next := q.head.next
-		if q.nodeCount > q.reserve {
-			q.nodeCount-- // 超过上限，丢弃该节点以控制内存
-		} else {
-			// 回收复用：先断开 next 防止成环，再追加到链表末尾
-			q.head.next = nil
-			q.last.next = q.head
-			q.last = q.head
-		}
-		q.head = next
-		return v, true
-	}
-
+	var batch [queueFeedBatch]T // 复用数组，避免每批分配
 	for {
 		q.mu.Lock()
-		v, ok := nextValue()
-		if ok {
+		// 一次取出至多 queueFeedBatch 个元素；链表为空则 n == 0
+		n := 0
+		for n < queueFeedBatch {
+			if q.head == q.tail {
+				break
+			}
+			batch[n] = q.head.value
+			// 清空引用，避免复用节点滞留旧值
+			q.head.value = *new(T)
+
+			next := q.head.next
+			if q.nodeCount > q.reserve {
+				q.nodeCount-- // 超过上限，丢弃该节点以控制内存
+			} else {
+				// 回收复用：先断开 next 防止成环，再追加到链表末尾
+				q.head.next = nil
+				q.last.next = q.head
+				q.last = q.head
+			}
+			q.head = next
+			n++
+		}
+		if n > 0 {
 			q.sending.Store(true) // 标记在途，供 empty() 识别
 			q.mu.Unlock()
-			q.ch <- v // 可能阻塞，不持锁
-			q.mu.Lock()
+			for i := 0; i < n; i++ {
+				q.ch <- batch[i] // 可能阻塞，不持锁
+			}
 			q.sending.Store(false)
-			q.mu.Unlock()
 			continue
 		}
 		closed := q.closed
