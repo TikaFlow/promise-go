@@ -201,29 +201,29 @@ func TestQueue(t *testing.T) {
 	})
 }
 
-// TestQueueSetRetain 覆盖 Queue.SetRetain 的边界与容量回收行为。
-func TestQueueSetRetain(t *testing.T) {
+// TestQueueSetReserve 覆盖 Queue.SetReserve 的边界与容量回收行为。
+func TestQueueSetReserve(t *testing.T) {
 	t.Parallel()
 
 	t.Run("boundaries", func(t *testing.T) {
 		t.Parallel()
 		q := NewQueue[int](64)
-		if q.SetRetain(64) {
-			t.Fatal("retain < 2×bufCap 应返回 false")
+		if q.SetReserve(64) {
+			t.Fatal("reserve < 2×bufCap 应返回 false")
 		}
-		if !q.SetRetain(128) {
-			t.Fatal("retain == 2×bufCap 应返回 true")
+		if !q.SetReserve(128) {
+			t.Fatal("reserve == 2×bufCap 应返回 true")
 		}
-		if !q.SetRetain(4_194_304) {
-			t.Fatal("retain == 上限 应返回 true")
+		if !q.SetReserve(4_194_304) {
+			t.Fatal("reserve == 上限 应返回 true")
 		}
-		if q.SetRetain(4_194_305) {
-			t.Fatal("retain > 上限 应返回 false")
+		if q.SetReserve(4_194_305) {
+			t.Fatal("reserve > 上限 应返回 false")
 		}
 		q.Close()
 	})
 
-	t.Run("retain-bound", func(t *testing.T) {
+	t.Run("reserve-bound", func(t *testing.T) {
 		t.Parallel()
 		q := NewQueue[int](64)
 

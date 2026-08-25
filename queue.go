@@ -10,8 +10,8 @@ const (
 	queueMinBufSize = 0x10
 	// queueMaxBufSize pop 通道缓冲区的最大容量
 	queueMaxBufSize = 0x100000
-	// queueMaxRetain 保留节点数的上限
-	queueMaxRetain = 0x400000
+	// queueMaxReserve 保留节点数的上限
+	queueMaxReserve = 0x400000
 )
 
 // queueNode 链表的节点：一个元素值 + 指向下一节点的指针
@@ -30,7 +30,7 @@ type Queue[T any] struct {
 	last      *queueNode[T] // 链表真正的末尾节点（next 为 nil）
 	nodeCount int           // 链上节点总数
 	bufCap    int           // pop 通道容量（构造时固定）
-	retain    int           // 保留节点上限
+	reserve   int           // 保留节点上限
 	closed    bool
 	ch        chan T        // 对外只读通道（有缓冲）
 	notify    chan struct{} // 信号通道，用于唤醒 feed goroutine
@@ -40,7 +40,7 @@ type Queue[T any] struct {
 // NewQueue 创建一个"无限容量"的 FIFO 队列。
 //
 // popBufSize 是 [Queue.Pop] 返回通道的缓冲容量，最小 16、最大 约1M（越界自动收敛）；
-// 预分配的节点数和默认保留上限均为 2×popBufSize，也是 [Queue.SetRetain] 的下限。
+// 预分配的节点数和默认保留上限均为 2×popBufSize，也是 [Queue.SetReserve] 的下限。
 // 创建后立即启动一个后台 goroutine（feed）负责搬运元素。
 func NewQueue[T any](popBufSize int) *Queue[T] {
 	if popBufSize < queueMinBufSize {
@@ -51,10 +51,10 @@ func NewQueue[T any](popBufSize int) *Queue[T] {
 	}
 	preAlloc := 2 * popBufSize
 	q := &Queue[T]{
-		bufCap: popBufSize,
-		retain: preAlloc,
-		ch:     make(chan T, popBufSize),
-		notify: make(chan struct{}, 1),
+		bufCap:  popBufSize,
+		reserve: preAlloc,
+		ch:      make(chan T, popBufSize),
+		notify:  make(chan struct{}, 1),
 	}
 	// 预分配 2×popBufSize 个节点，作为初始复用池
 	head := &queueNode[T]{}
@@ -111,8 +111,10 @@ func (q *Queue[T]) Pop() <-chan T {
 	return q.ch
 }
 
-// Close 关闭队列：此后 [Queue.Push] 返回 false；已入队元素仍可被消费，
-// 全部消费后 [Queue.Pop] 返回的通道才会关闭。重复调用返回 false。
+// Close 关闭队列：此后 [Queue.Push] 返回 false；已入队元素仍可被消费。
+// feed 排空内部链表后会立即关闭 [Queue.Pop] 返回的通道；带缓冲通道关闭后
+// 仍可读取其中元素，因此调用方在通道关闭后依然能读完所有已入队元素。
+// 重复调用返回 false。
 func (q *Queue[T]) Close() bool {
 	q.mu.Lock()
 	if q.closed {
@@ -129,16 +131,19 @@ func (q *Queue[T]) Close() bool {
 	return true
 }
 
-// SetRetain 设置保留的最大节点数，取值范围为 [2×bufCap, maxRetain]，越界时不生效并返回 false。
-// 默认保留上限为 2×bufCap。当链上节点数超过该值时，消费完的节点不再回收，
-// 从而把内存控制在 retain 附近；传入值越小，回收越早、内存占用越低，但会相应增加分配频率。
+// SetReserve 设置复用池的节点保留上限，取值范围为 [2×bufCap, queueMaxReserve]，
+// 越界时不生效并返回 false。默认保留上限为 2×bufCap。
+//
+// 当链上节点数超过该上限时，消费完的节点被丢弃而非回收复用，从而把"消费后"
+// 保留的节点数控制在上限附近；传入值越小，回收越早、内存占用越低，但会增加
+// 后续分配的频率。该值只约束消费侧内存：若只 Push 而不消费，链表仍会无界增长。
 // 调用后下次消费时生效。
-func (q *Queue[T]) SetRetain(n int) bool {
-	if n < 2*q.bufCap || n > queueMaxRetain {
+func (q *Queue[T]) SetReserve(n int) bool {
+	if n < 2*q.bufCap || n > queueMaxReserve {
 		return false
 	}
 	q.mu.Lock()
-	q.retain = n
+	q.reserve = n
 	q.mu.Unlock()
 	return true
 }
@@ -161,7 +166,7 @@ func (q *Queue[T]) feed() {
 		q.head.value = *new(T)
 
 		next := q.head.next
-		if q.nodeCount > q.retain {
+		if q.nodeCount > q.reserve {
 			q.nodeCount-- // 超过上限，丢弃该节点以控制内存
 		} else {
 			// 回收复用：先断开 next 防止成环，再追加到链表末尾
@@ -195,8 +200,11 @@ func (q *Queue[T]) feed() {
 	}
 }
 
-// empty 报告是否没有待读元素：内部链表为空、feed 无在途发送，且 pop 通道已空。
+// empty 报告"调用瞬间"是否没有待读元素：内部链表为空、feed 无在途发送，且 pop 通道已空。
 // 末项用于识别 Push 直写入 ch 的元素，保证事件循环排空时不会漏掉它们。
+//
+// 注意：empty 返回的是瞬时快照，返回 true 不代表此后不会再有元素入队；
+// 调用方必须保证在判定队列为空之后仍能消费到后续 Push 的元素（如依赖后续阻塞读取）。
 func (q *Queue[T]) empty() bool {
 	q.mu.Lock()
 	empty := q.head == q.tail
