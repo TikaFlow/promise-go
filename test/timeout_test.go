@@ -8,76 +8,90 @@ import (
 	. "github.com/TikaFlow/promise-go"
 )
 
-// Timeout：base 永不 settle → 在 millis 后以 *TimeoutError 拒绝。
-func TestTimeoutWhenNeverSettles(t *testing.T) {
+// TestTimeout 覆盖 EventLoop.Timeout 全部分支。
+func TestTimeout(t *testing.T) {
 	t.Parallel()
 
-	p, _, _ := el.PromiseWithResolvers()
-	tp := el.Timeout(p, 50)
+	t.Run("never-settles", func(t *testing.T) {
+		t.Parallel()
+		p, _, _ := el.PromiseWithResolvers()
+		tp := el.Timeout(p, 50)
 
-	mustSettle(t, tp, 2*time.Second)
-	if tp.State() != Rejected {
-		t.Fatalf("expect Rejected, got %s", tp.State())
-	}
-	var te *TimeoutError
-	if !errors.As(tp.Reason(), &te) {
-		t.Fatalf("expect *TimeoutError, got %v", tp.Reason())
-	}
-}
+		mustSettle(t, tp, 2*time.Second)
+		if tp.State() != Rejected {
+			t.Fatalf("expect Rejected, got %s", tp.State())
+		}
+		var te *TimeoutError
+		if !errors.As(tp.Reason(), &te) {
+			t.Fatalf("expect *TimeoutError, got %v", tp.Reason())
+		}
+	})
 
-// Timeout：base 已决（值）→ 跟随其值，且不误超时。
-func TestTimeoutWhenAlreadySettled(t *testing.T) {
-	t.Parallel()
-	tp := el.Timeout("ok", 200)
-	mustSettle(t, tp, 2*time.Second)
-	if tp.State() != Fulfilled {
-		t.Fatalf("expect Fulfilled, got %s", tp.State())
-	}
-	if tp.Value() != "ok" {
-		t.Fatalf("unexpected value: %v", tp.Value())
-	}
-}
+	t.Run("already-settled", func(t *testing.T) {
+		t.Parallel()
+		tp := el.Timeout("ok", 200)
+		mustSettle(t, tp, 2*time.Second)
+		if tp.State() != Fulfilled {
+			t.Fatalf("expect Fulfilled, got %s", tp.State())
+		}
+		if v := tp.Value(); v != "ok" {
+			t.Fatalf("unexpected value: %v", v)
+		}
+	})
 
-// Timeout：base 晚于 deadline 才 settle → 超时拒绝。
-func TestTimeoutWhenSettlesLate(t *testing.T) {
-	t.Parallel()
-	p, resolve, _ := el.PromiseWithResolvers()
-	el.SetTimeout(func() { resolve("too late") }, 300)
-	tp := el.Timeout(p, 50)
+	t.Run("settles-late", func(t *testing.T) {
+		t.Parallel()
+		p, resolve, _ := el.PromiseWithResolvers()
+		el.SetTimeout(func() { resolve("too late") }, 300)
+		tp := el.Timeout(p, 50)
 
-	mustSettle(t, tp, 2*time.Second)
-	if tp.State() != Rejected {
-		t.Fatalf("expect Rejected, got %s", tp.State())
-	}
-	var te *TimeoutError
-	if !errors.As(tp.Reason(), &te) {
-		t.Fatalf("expect *TimeoutError, got %v", tp.Reason())
-	}
-}
+		mustSettle(t, tp, 2*time.Second)
+		if tp.State() != Rejected {
+			t.Fatalf("expect Rejected, got %s", tp.State())
+		}
+		var te *TimeoutError
+		if !errors.As(tp.Reason(), &te) {
+			t.Fatalf("expect *TimeoutError, got %v", tp.Reason())
+		}
+	})
 
-// Timeout：base 拒绝 → 跟随其拒绝理由（而非超时）。
-func TestTimeoutWhenBaseRejected(t *testing.T) {
-	t.Parallel()
-	base := el.Reject(errors.New("base rejected"))
-	tp := el.Timeout(base, 200)
-	mustSettle(t, tp, 2*time.Second)
-	if tp.State() != Rejected {
-		t.Fatalf("expect Rejected, got %s", tp.State())
-	}
-	if tp.Reason().Error() != "base rejected" {
-		t.Fatalf("unexpected reason: %v", tp.Reason())
-	}
-}
+	t.Run("base-rejected", func(t *testing.T) {
+		t.Parallel()
+		base := el.Reject(errors.New("base rejected"))
+		tp := el.Timeout(base, 200)
+		mustSettle(t, tp, 2*time.Second)
+		if tp.State() != Rejected {
+			t.Fatalf("expect Rejected, got %s", tp.State())
+		}
+		if got := tp.Reason().Error(); got != "base rejected" {
+			t.Fatalf("unexpected reason: %v", got)
+		}
+	})
 
-// Timeout：非 promise 值 → 立即跟随，不超时。
-func TestTimeoutWithPlainValue(t *testing.T) {
-	t.Parallel()
-	tp := el.Timeout(42, 200)
-	mustSettle(t, tp, 2*time.Second)
-	if tp.State() != Fulfilled {
-		t.Fatalf("expect Fulfilled, got %s", tp.State())
-	}
-	if tp.Value() != 42 {
-		t.Fatalf("unexpected value: %v", tp.Value())
-	}
+	t.Run("plain-value", func(t *testing.T) {
+		t.Parallel()
+		tp := el.Timeout(42, 200)
+		mustSettle(t, tp, 2*time.Second)
+		if tp.State() != Fulfilled {
+			t.Fatalf("expect Fulfilled, got %s", tp.State())
+		}
+		if v := tp.Value(); v != 42 {
+			t.Fatalf("unexpected value: %v", v)
+		}
+	})
+
+	t.Run("negative-millis-treats-as-zero", func(t *testing.T) {
+		t.Parallel()
+		// millis 负值按 0 处理：base 永不 settle → 立即超时拒绝。
+		p, _, _ := el.PromiseWithResolvers()
+		tp := el.Timeout(p, -1)
+		mustSettle(t, tp, 2*time.Second)
+		if tp.State() != Rejected {
+			t.Fatalf("expect Rejected, got %s", tp.State())
+		}
+		var te *TimeoutError
+		if !errors.As(tp.Reason(), &te) {
+			t.Fatalf("expect *TimeoutError, got %v", tp.Reason())
+		}
+	})
 }

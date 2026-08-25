@@ -8,6 +8,88 @@ import (
 	. "github.com/TikaFlow/promise-go"
 )
 
+// TestAwait 覆盖 EventLoop.Await 全部分支。
+func TestAwait(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fulfilled", func(t *testing.T) {
+		t.Parallel()
+		p := el.NewPromise(func(resolve, reject func(v any)) error {
+			resolve("success")
+			return nil
+		})
+		res, err := el.Await(p, 50)
+		if err != nil {
+			t.Fatalf("Expected nil, got %v", err)
+		}
+		if res != "success" {
+			t.Fatalf("Expected 'success', got %s", res)
+		}
+	})
+
+	t.Run("rejected", func(t *testing.T) {
+		t.Parallel()
+		p := el.NewPromise(func(resolve, reject func(v any)) error {
+			reject("error")
+			return nil
+		})
+		_, err := el.Await(p, 50)
+		if err == nil {
+			t.Fatalf("Expected error, got nil")
+		}
+		if err.Error() != "UnexpectedError: error" {
+			t.Fatalf("Expected error 'UnexpectedError: error', got %s", err)
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		t.Parallel()
+		p := el.NewPromise(func(resolve, reject func(v any)) error {
+			el.SetTimeout(func() {
+				resolve("success")
+			}, 100)
+			return nil
+		})
+		_, err := el.Await(p, 50)
+		if err == nil {
+			t.Fatalf("Expected error, got nil")
+		}
+		if err.Error() != "TimeoutError: await timeout" {
+			t.Fatalf("Expected 'TimeoutError: await timeout', got %s", err)
+		}
+		// 等待基 promise 已决，避免其回调在测试结束后才执行干扰后续。
+		time.Sleep(2 * time.Second)
+	})
+
+	t.Run("timeout-not-positive", func(t *testing.T) {
+		t.Parallel()
+		p := el.NewPromise(func(resolve, reject func(v any)) error {
+			resolve("success")
+			return nil
+		})
+		expected := "RangeError: await timeout must be greater than 0"
+		_, err := el.Await(p, -100)
+		if err == nil {
+			t.Fatalf("Expected error, got nil")
+		}
+		if err.Error() != expected {
+			t.Fatalf("Expected error '%s', got %s", expected, err)
+		}
+	})
+
+	t.Run("non-promise-value", func(t *testing.T) {
+		t.Parallel()
+		// 非 Promise 实例直接返回原值，不参与调度。
+		v, err := el.Await("plain", 100)
+		if err != nil {
+			t.Fatalf("Expected nil error, got %v", err)
+		}
+		if v != "plain" {
+			t.Fatalf("Expected 'plain', got %v", v)
+		}
+	})
+}
+
 // 回归：在 setTimeout 回调（looper 上）内 Await 一个由独立 goroutine resolve 的
 // promise，应正常返回而不死锁（resolve 不依赖 looper 推进）。
 func TestAwaitInsideTimerCallback(t *testing.T) {
