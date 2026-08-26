@@ -30,7 +30,7 @@ func (el *EventLoop) Async(fn func() (any, error)) *Promise {
 			}
 			resolve(v)
 		}
-		el.pushTask(task)
+		el.worker.Add(task)
 		return nil
 	})
 }

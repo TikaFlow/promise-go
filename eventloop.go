@@ -10,7 +10,7 @@ import (
 // taskQueueBufSize 微任务/宏任务 Queue 的 pop 通道缓冲容量
 const taskQueueBufSize = 1024
 
-// EventLoop 核心接口，定义了 [Promise] 异步相关的API
+// EventLoop 核心接口，定义了 [Promise] 异步相关的 API
 //
 // # 通过 nil 调用 EventLoop 的任何方法都可能触发 panic
 type EventLoop struct {
@@ -107,11 +107,6 @@ func (el *EventLoop) run() {
 			return
 		}
 	}
-}
-
-// 将一个异步任务添加到工作池
-func (el *EventLoop) pushTask(fn func()) {
-	el.worker.Add(fn)
 }
 
 // OffPromise 解绑一个钩子函数
