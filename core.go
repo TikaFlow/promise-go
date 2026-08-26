@@ -25,6 +25,7 @@ package promise
 import (
 	"time"
 
+	uqueue "github.com/TikaFlow/unbounded-queue"
 	pool "github.com/TikaFlow/worker-pool"
 )
 
@@ -76,8 +77,8 @@ type Executor func(resolve, reject func(v any)) (err error)
 //   - workerCount: 工作线程数量
 func StartEventLoop(workerCount int) *EventLoop {
 	el := &EventLoop{
-		microtaskQueue: NewQueue[func()](taskQueueBufSize),
-		macrotaskQueue: NewQueue[func()](taskQueueBufSize),
+		microtaskQueue: uqueue.NewQueue[func()](taskQueueBufSize),
+		macrotaskQueue: uqueue.NewQueue[func()](taskQueueBufSize),
 		done:           make(chan struct{}),
 	}
 
@@ -91,8 +92,8 @@ func StartEventLoop(workerCount int) *EventLoop {
 		nextID:    0,
 		tasks:     make([]*timedTask, 0, 1024*10),
 		timer:     time.NewTimer(100 * 365 * 24 * time.Hour),
-		taskCh:    NewQueue[*timedTask](taskQueueBufSize),
-		clearCh:   NewQueue[int](taskQueueBufSize),
+		taskCh:    uqueue.NewQueue[*timedTask](taskQueueBufSize),
+		clearCh:   uqueue.NewQueue[int](taskQueueBufSize),
 		eventLoop: el,
 	}
 	el.hooks = &hooks{

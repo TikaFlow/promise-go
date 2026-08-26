@@ -3,6 +3,8 @@ package promise
 import (
 	"sync"
 	"time"
+
+	uqueue "github.com/TikaFlow/unbounded-queue"
 )
 
 // invalidTimerID 无效定时器 ID
@@ -14,8 +16,8 @@ type timeLine struct {
 	idLock    sync.Mutex
 	tasks     []*timedTask
 	timer     *time.Timer
-	taskCh    *Queue[*timedTask]
-	clearCh   *Queue[int]
+	taskCh    uqueue.UQueue[*timedTask]
+	clearCh   uqueue.UQueue[int]
 	eventLoop *EventLoop
 }
 
@@ -157,8 +159,8 @@ func (tl *timeLine) run() {
 		case <-tl.timer.C:
 			tl.consumeTask()
 		case <-tl.eventLoop.done:
-			tl.taskCh.Close()
-			tl.clearCh.Close()
+			_ = tl.taskCh.Close()
+			_ = tl.clearCh.Close()
 			// 关闭定时器
 			if !tl.timer.Stop() {
 				select {

@@ -1,2 +1,4 @@
+github.com/TikaFlow/unbounded-queue v0.1.0 h1:1vmQBcf8h6ld2g02IylQY7uwdCAOQ0sS9AK38n/XP68=
+github.com/TikaFlow/unbounded-queue v0.1.0/go.mod h1:1POvXFMNYHBTXvTz0QIUzrRl79FHgQEkUtNlF3gHOTg=
 github.com/TikaFlow/worker-pool v0.1.8 h1:qDqau6jvvoIje93L2WZx9ds1GQSCWCnZF3rIS3vhLAc=
 github.com/TikaFlow/worker-pool v0.1.8/go.mod h1:ZJIOH7pGBkkOaI3aEwRh1aqFalq2ZG/D5U8OYzySNdE=

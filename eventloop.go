@@ -3,6 +3,7 @@ package promise
 import (
 	"sync"
 
+	uqueue "github.com/TikaFlow/unbounded-queue"
 	pool "github.com/TikaFlow/worker-pool"
 )
 
@@ -13,8 +14,8 @@ const taskQueueBufSize = 1024
 //
 // # 通过 nil 调用 EventLoop 的任何方法都可能触发 panic
 type EventLoop struct {
-	microtaskQueue *Queue[func()]
-	macrotaskQueue *Queue[func()]
+	microtaskQueue uqueue.UQueue[func()]
+	macrotaskQueue uqueue.UQueue[func()]
 	looper         pool.Pool
 	scheduler      pool.Pool
 	worker         pool.Pool
@@ -55,7 +56,7 @@ func (el *EventLoop) drainMicro() bool {
 		default:
 		}
 		// 所有即时可读的任务已消费完；若队列真为空则排空完成
-		if el.microtaskQueue.empty() {
+		if el.microtaskQueue.Len() == 0 {
 			return true
 		}
 		// 链表尚有数据在搬运途中，阻塞等待 feed 送达
@@ -205,8 +206,8 @@ func (el *EventLoop) OnPromise(event HookType, hook func(p *Promise)) string {
 func (el *EventLoop) Stop() {
 	el.stopOnce.Do(func() {
 		close(el.done)
-		el.microtaskQueue.Close()
-		el.macrotaskQueue.Close()
+		_ = el.microtaskQueue.Close()
+		_ = el.macrotaskQueue.Close()
 		_ = el.worker.Close()
 		_ = el.scheduler.Close()
 		_ = el.looper.Close()
